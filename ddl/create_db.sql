@@ -195,9 +195,62 @@ END;
 -- CREATE PROCEDURE 
 --    PARTITION ON TABLE user_table COLUMN userid
 --    FROM CLASS chargingdemoprocs.GetAndLockUser;
---   
 
- 
+
+CREATE OR REPLACE PROCEDURE GetAndLockUser(p_userid bigint, p_new_lock_id bigint)
+AS
+DECLARE
+--
+  l_status_byte int := 42; 
+  l_status_string text := 'OK';
+--
+  q_user_exists QUERY(userid BIGINT) = SELECT userid FROM user_table WHERE userid = p_userid;
+  q_user_timestamp QUERY(user_softlock_expiry TIMESTAMP) = SELECT user_softlock_expiry FROM user_table WHERE userid = p_userid;
+  q_locking_session QUERY(user_softlock_sessionid bigint) = SELECT user_softlock_sessionid FROM user_table WHERE userid = p_userid;
+--
+  l_found_userid bigint := -1;
+  l_user_softlock_expiry timestamp := null;
+--
+BEGIN
+--
+  l_found_userid = SCALER (q_user_exists);
+--
+  IF l_found_userid = p_userid THEN
+--
+    l_user_softlock_expiry = SCALER(q_user_timestamp);
+    IF l_user_softlock_expiry IS NULL OR l_user_softlock_expiry > NOW(6) THEN
+--
+--  Take lock...
+--
+      UPDATE user_table SET user_softlock_sessionid = p_new_lock_id, user_softlock_expiry = DATEADD('second', 1, NOW)  WHERE userid = p_userid;
+      l_status_byte = 54; 
+      l_status_string = 'User ' || p_userid || ' locked by session '||SCALER(q_locking_session);
+-- 
+    ELSE
+-- 
+--    Record is locked - STATUS_RECORD_ALREADY_SOFTLOCKED
+--
+      l_status_byte = 53; 
+      l_status_string = 'User ' || p_userid || ' already locked by session '||SCALER(q_locking_session);
+--
+    END IF;
+--
+  ELSE
+--
+-- No user found. Set STATUS_USER_DOESNT_EXIST
+--
+    l_status_byte = 53; 
+    l_status_string = 'User ' || p_userid || ' does not exist';
+--
+  END IF;
+--
+ECHO SELECT * FROM user_table WHERE userid = p_userid;
+ECHO SELECT user_txn_id, txn_time FROM user_recent_transactions WHERE userid = p_userid ORDER BY txn_time, user_txn_id;
+ECHO SELECT * FROM user_usage_table WHERE userid = p_userid ORDER BY sessionid;
+echo SELECT l_status_byte, l_status_string from dual;
+END;
+
+
 -- CREATE PROCEDURE 
 --    PARTITION ON TABLE user_table COLUMN userid
 --    FROM CLASS chargingdemoprocs.UpdateLockedUser;
