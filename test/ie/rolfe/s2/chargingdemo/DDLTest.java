@@ -27,6 +27,7 @@ class DDLTest {
     final long TEST_USER_ID = 42;
     final long BAD_USER_ID = 2;
     final long TEST_SESSION_ID = 12;
+    final long BAD_SESSION_ID = 13;
     final long TEST_BALANCE = 1000;
     final long TEST_ALLOCATED = 10;
     final String[] setupDML = {"INSERT INTO user_table  " +
@@ -484,6 +485,68 @@ class DDLTest {
 
     }
 
+    @Test
+    void UpdateUserWrongSessionId() {
+        BaseChargingDemo.msg("UpdateUserRealUser");
+        try {
+
+            CallableStatement cs = connection.prepareCall("call GetAndLockUser(?,?)\n");
+            cs.setLong(1, TEST_USER_ID);
+            cs.setLong(2, BAD_SESSION_ID);
+            cs.execute();
+            connection.commit();
+
+            //
+            // make sure is unlocked...
+            long lockingSessionId = getLongFromUserTable("user_softlock_sessionid");
+
+            if (lockingSessionId != BAD_SESSION_ID) {
+                fail("GetAndLockUserRealUser: Saw " + lockingSessionId + ", expected " + BAD_SESSION_ID);
+            }
+
+
+            cs = connection.prepareCall("call UpdateLockedUser(?,?,?,?)\n");
+            cs.setLong(1, TEST_USER_ID);
+            cs.setLong(2, TEST_SESSION_ID);
+            cs.setString(3,TEST_JSON_OBJECT);
+            cs.setString(4,TEST_JSON_REPLACE);
+            cs.execute();
+
+            int rowCount = 0;
+            long l_status_byte = Long.MIN_VALUE;
+
+
+            do {
+                try (ResultSet resultSet = cs.getResultSet()) {
+                    if (resultSet != null && hasColumn(resultSet, "l_status_byte")) {
+
+                        while (resultSet.next()) {
+                            rowCount++;
+                            l_status_byte = resultSet.getLong("l_status_byte");
+                            BaseChargingDemo.msg(this.getClass().getName() + ":Found " + l_status_byte);
+                        }
+                    }
+                } catch (SQLException e) {
+                    BaseChargingDemo.msg(e.getMessage());
+                    fail(e);
+                    throw new RuntimeException(e);
+                }
+            } while (cs.getMoreResults());
+
+            if (l_status_byte != STATUS_RECORD_ALREADY_SOFTLOCKED) {
+                fail("UpdateUserRealUser: return code should be " + STATUS_RECORD_ALREADY_SOFTLOCKED + ". " + " got " + l_status_byte);
+            }
+
+
+
+
+        } catch (SQLException e) {
+            BaseChargingDemo.msg(e.getMessage());
+            fail(e);
+            throw new RuntimeException(e);
+        }
+
+    }
 
 
     @Test
