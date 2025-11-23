@@ -16,7 +16,6 @@
 package ie.rolfe.s2.chargingdemo.callbacks;
 
 
-import ie.rolfe.s2.*;
 
 /**
  * Simple callback that complains if something went badly wrong.
@@ -24,15 +23,15 @@ import ie.rolfe.s2.*;
  * @author drolfe
  *
  */
-public class ComplainOnErrorCallback implements ProcedureCallback {
-
-    @Override
-    public void clientCallback(ClientResponse arg0) throws Exception {
-
-        if (arg0.getStatus() != ClientResponse.SUCCESS) {
-            BaseChargingDemo.msg("Error Code " + arg0.getStatusString());
-        }
-
-    }
+public class ComplainOnErrorCallback  {
+//
+//    @Override
+//    public void clientCallback(ClientResponse arg0) throws Exception {
+//
+//        if (arg0.getStatus() != ClientResponse.SUCCESS) {
+//            BaseChargingDemo.msg("Error Code " + arg0.getStatusString());
+//        }
+//
+//    }
 
 }

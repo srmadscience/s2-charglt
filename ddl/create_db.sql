@@ -7,7 +7,8 @@ CREATE rowstore table user_table
 ,user_json_object varchar(8000)
 ,user_last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ,user_softlock_sessionid bigint 
-,user_softlock_expiry TIMESTAMP);
+,user_softlock_expiry TIMESTAMP
+,user_balance bigint not null);
 
 create index ut_del on user_table(user_last_seen);
 
@@ -72,9 +73,9 @@ select sum(allocated_amount) allocated_amount
 from user_usage_table;
 
 create view users_sessions as 
-select userid,  sessionid, count(*) how_many 
+select userid, count(*) how_many 
 from user_usage_table
-group by  userid,  sessionid;
+group by  userid;
 
 -- create index uss_ix1 on users_sessions (how_many) WHERE how_many > 1;
 
@@ -130,7 +131,7 @@ AS
 BEGIN
 ECHO SELECT * FROM users_sessions
 WHERE how_many > 1
-ORDER BY how_many, userid, sessionid
+ORDER BY how_many, userid
 LIMIT 50;
 END//
 
@@ -188,7 +189,6 @@ AS
 BEGIN
 ECHO SELECT * FROM user_table WHERE userid = p_userid;
 ECHO SELECT * FROM user_usage_table WHERE userid = p_userid ORDER BY sessionid;
-ECHO SELECT * FROM user_balance WHERE userid = p_userid;
 ECHO SELECT * FROM user_recent_transactions WHERE userid = p_userid ORDER BY txn_time, user_txn_id;
 END;
 
@@ -204,34 +204,39 @@ DECLARE
   l_status_byte int := 42; 
   l_status_string text := 'OK';
 --
-  q_user_exists QUERY(userid BIGINT) = SELECT userid FROM user_table WHERE userid = p_userid;
-  q_user_timestamp QUERY(user_softlock_expiry TIMESTAMP) = SELECT user_softlock_expiry FROM user_table WHERE userid = p_userid;
-  q_locking_session QUERY(user_softlock_sessionid bigint) = SELECT user_softlock_sessionid FROM user_table WHERE userid = p_userid;
+  q_user QUERY(userid BIGINT,user_softlock_expiry TIMESTAMP, user_softlock_sessionid bigint) = 
+     SELECT userid, user_softlock_expiry, user_softlock_sessionid FROM user_table WHERE userid = p_userid;
 --
-  l_found_userid bigint := -1;
+  l_found_userid bigint := null;
   l_user_softlock_expiry timestamp := null;
+  l_user_softlock_sessionid bigint := null;
 --
 BEGIN
 --
-  l_found_userid = SCALER (q_user_exists);
+  FOR x IN COLLECT(q_user) LOOP
+--
+    l_found_userid := x.userid;
+    l_user_softlock_expiry := x.user_softlock_expiry;
+    l_user_softlock_sessionid := x.user_softlock_sessionid;
+--
+  END LOOP;
 --
   IF l_found_userid = p_userid THEN
 --
-    l_user_softlock_expiry = SCALER(q_user_timestamp);
-    IF l_user_softlock_expiry IS NULL OR l_user_softlock_expiry > NOW(6) THEN
+    IF l_user_softlock_sessionid = p_new_lock_id OR l_user_softlock_expiry IS NULL OR l_user_softlock_expiry < NOW(6) THEN
 --
 --  Take lock...
 --
-      UPDATE user_table SET user_softlock_sessionid = p_new_lock_id, user_softlock_expiry = DATEADD('second', 1, NOW)  WHERE userid = p_userid;
+      UPDATE user_table SET user_softlock_sessionid = p_new_lock_id, user_softlock_expiry = DATE_ADD(NOW(), INTERVAL 1 SECOND)  WHERE userid = p_userid;
       l_status_byte = 54; 
-      l_status_string = 'User ' || p_userid || ' locked by session '||SCALER(q_locking_session);
+      l_status_string = 'User ' || p_userid || ' locked by session '||l_user_softlock_sessionid;
 -- 
     ELSE
 -- 
 --    Record is locked - STATUS_RECORD_ALREADY_SOFTLOCKED
 --
       l_status_byte = 53; 
-      l_status_string = 'User ' || p_userid || ' already locked by session '||SCALER(q_locking_session);
+      l_status_string = 'User ' || p_userid || ' already locked by session '||l_user_softlock_sessionid;
 --
     END IF;
 --
@@ -239,7 +244,7 @@ BEGIN
 --
 -- No user found. Set STATUS_USER_DOESNT_EXIST
 --
-    l_status_byte = 53; 
+    l_status_byte = 50; 
     l_status_string = 'User ' || p_userid || ' does not exist';
 --
   END IF;
@@ -267,7 +272,6 @@ CREATE OR REPLACE PROCEDURE DelUser (p_userid bigint) AS
 BEGIN
 DELETE FROM user_table WHERE userid = p_userid;
 DELETE FROM user_usage_table WHERE userid = p_userid;
-DELETE FROM user_balance WHERE userid = p_userid;
 DELETE FROM user_recent_transactions WHERE userid = p_userid;
 END;
 

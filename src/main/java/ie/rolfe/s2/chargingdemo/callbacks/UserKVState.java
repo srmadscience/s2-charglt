@@ -16,7 +16,7 @@
 package ie.rolfe.s2.chargingdemo.callbacks;
 
 
-import org.voltdb.chargingdemo.BaseChargingDemo;
+
 
 /* This file is part of VoltDB.
  * Copyright (C) 2008-2022 VoltDB Inc.
@@ -41,18 +41,17 @@ import org.voltdb.chargingdemo.BaseChargingDemo;
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcedureCallback;
+
 import org.voltdb.voltutil.stats.SafeHistogramCache;
 
-import chargingdemoprocs.ReferenceData;
+
 
 /**
  * Class to keep track of a user's state. It implements ProcedureCallback, which
  * means the clientCallback method is called when callProcedure finishes.
  *
  */
-public class UserKVState implements ProcedureCallback {
+public class UserKVState  {
 
     public static final byte STATUS_UNLOCKED = 0;
     public static final byte STATUS_TRYING_TO_LOCK = 1;
@@ -133,52 +132,52 @@ public class UserKVState implements ProcedureCallback {
         return userState;
     }
 
-    @Override
-    public void clientCallback(ClientResponse arg0) throws Exception {
-
-        if (arg0.getStatus() == ClientResponse.SUCCESS) {
-
-            byte statusByte = arg0.getAppStatus();
-
-            if (userState == STATUS_UNLOCKED) {
-                BaseChargingDemo.msg("UserKVState.clientCallback: got app status of " + arg0.getAppStatusString());
-            } else if (userState == STATUS_TRYING_TO_LOCK) {
-
-                shc.reportLatencyMicros(BaseChargingDemo.KV_GET, txStartMicros, BaseChargingDemo.KV_GET,
-                        BaseChargingDemo.HISTOGRAM_SIZE_MS, 1);
-
-                if (statusByte == ReferenceData.STATUS_RECORD_HAS_BEEN_SOFTLOCKED) {
-
-                    userState = STATUS_LOCKED;
-                    lockId = arg0.getAppStatusString();
-
-                } else if (statusByte == ReferenceData.STATUS_RECORD_ALREADY_SOFTLOCKED) {
-
-                    userState = STATUS_LOCKED_BY_SOMEONE_ELSE;
-                    lockId = "";
-                    lockedBySomeoneElseCount++;
-                    otherLockTimeMs = System.currentTimeMillis();
-
-                } else {
-                    userState = STATUS_UNLOCKED;
-                }
-            } else if (userState == STATUS_UPDATING) {
-
-                shc.reportLatencyMicros(BaseChargingDemo.KV_PUT, txStartMicros, BaseChargingDemo.KV_PUT,
-                        BaseChargingDemo.HISTOGRAM_SIZE_MS, 1);
-
-                lockId = "";
-                userState = STATUS_UNLOCKED;
-
-            }
-
-        } else {
-            BaseChargingDemo.msg("UserKVState.clientCallback: got status of " + arg0.getStatusString());
-        }
-
-        // End transaction
-        txStartMicros = 0;
-    }
+//    @Override
+//    public void clientCallback(ClientResponse arg0) throws Exception {
+//
+//        if (arg0.getStatus() == ClientResponse.SUCCESS) {
+//
+//            byte statusByte = arg0.getAppStatus();
+//
+//            if (userState == STATUS_UNLOCKED) {
+//                BaseChargingDemo.msg("UserKVState.clientCallback: got app status of " + arg0.getAppStatusString());
+//            } else if (userState == STATUS_TRYING_TO_LOCK) {
+//
+//                shc.reportLatencyMicros(BaseChargingDemo.KV_GET, txStartMicros, BaseChargingDemo.KV_GET,
+//                        BaseChargingDemo.HISTOGRAM_SIZE_MS, 1);
+//
+//                if (statusByte == ReferenceData.STATUS_RECORD_HAS_BEEN_SOFTLOCKED) {
+//
+//                    userState = STATUS_LOCKED;
+//                    lockId = arg0.getAppStatusString();
+//
+//                } else if (statusByte == ReferenceData.STATUS_RECORD_ALREADY_SOFTLOCKED) {
+//
+//                    userState = STATUS_LOCKED_BY_SOMEONE_ELSE;
+//                    lockId = "";
+//                    lockedBySomeoneElseCount++;
+//                    otherLockTimeMs = System.currentTimeMillis();
+//
+//                } else {
+//                    userState = STATUS_UNLOCKED;
+//                }
+//            } else if (userState == STATUS_UPDATING) {
+//
+//                shc.reportLatencyMicros(BaseChargingDemo.KV_PUT, txStartMicros, BaseChargingDemo.KV_PUT,
+//                        BaseChargingDemo.HISTOGRAM_SIZE_MS, 1);
+//
+//                lockId = "";
+//                userState = STATUS_UNLOCKED;
+//
+//            }
+//
+//        } else {
+//            BaseChargingDemo.msg("UserKVState.clientCallback: got status of " + arg0.getStatusString());
+//        }
+//
+//        // End transaction
+//        txStartMicros = 0;
+//    }
 
     /**
      * @return the lockId

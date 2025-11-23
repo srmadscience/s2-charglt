@@ -193,12 +193,10 @@ public abstract class BaseChargingDemo {
 	 * @param ourJson
 	 * @param initialCredit
 	 * @param mainConnection
-	 * @throws InterruptedException
-	 * @throws IOException
-	 * @throws NoConnectionsException
+
 	 */
 	protected static void upsertAllUsers(int userCount, int tpMs, String ourJson, int initialCredit,
-			Connection mainConnection) throws InterruptedException, IOException, NoConnectionsException {
+			Connection mainConnection) throws InterruptedException {
 
 		final long startMsUpsert = System.currentTimeMillis();
 
@@ -218,10 +216,10 @@ public abstract class BaseChargingDemo {
 				tpThisMs = 0;
 			}
 
-			ComplainOnErrorCallback upsertUserCallback = new ComplainOnErrorCallback();
-
-			mainConnection.callProcedure(upsertUserCallback, "UpsertUser", i, r.nextInt(initialCredit), ourJson,
-					"Created", new Date(startMsUpsert), "Create_" + i);
+//			ComplainOnErrorCallback upsertUserCallback = new ComplainOnErrorCallback();
+//
+//			mainConnection.callProcedure(upsertUserCallback, "UpsertUser", i, r.nextInt(initialCredit), ourJson,
+//					"Created", new Date(startMsUpsert), "Create_" + i);
 
 			if (i % 100000 == 1) {
 				msg("Upserted " + i + " users...");
@@ -231,7 +229,7 @@ public abstract class BaseChargingDemo {
 		}
 
 		msg("All " + userCount + " entries in queue, waiting for it to drain...");
-		mainConnection.drain();
+		//mainConnection.drain();
 
 		long entriesPerMS = userCount / (System.currentTimeMillis() - startMsUpsert);
 		msg("Upserted " + entriesPerMS + " users per ms...");
@@ -242,27 +240,25 @@ public abstract class BaseChargingDemo {
 	 *
 	 * @param mainConnection
 	 * @param queryUserId
-	 * @throws IOException
-	 * @throws NoConnectionsException
-	 * @throws ProcCallException
+
 	 */
 	protected static void queryUserAndStats(Connection mainConnection, long queryUserId)
-			throws IOException, NoConnectionsException, ProcCallException {
+			{
 
-		// Query user #queryUserId...
-		msg("Query user #" + queryUserId + "...");
-		ConnectionResponse userResponse = mainConnection.callProcedure("GetUser", queryUserId);
-
-		for (int i = 0; i < userResponse.getResults().length; i++) {
-			msg(System.lineSeparator() + userResponse.getResults()[i].toFormattedString());
-		}
-
-		msg("Show amount of credit currently reserved for products...");
-		ConnectionResponse allocResponse = mainConnection.callProcedure("ShowCurrentAllocations__promBL");
-
-		for (int i = 0; i < allocResponse.getResults().length; i++) {
-			msg(System.lineSeparator() + allocResponse.getResults()[i].toFormattedString());
-		}
+//		// Query user #queryUserId...
+//		msg("Query user #" + queryUserId + "...");
+//		ConnectionResponse userResponse = mainConnection.callProcedure("GetUser", queryUserId);
+//
+//		for (int i = 0; i < userResponse.getResults().length; i++) {
+//			msg(System.lineSeparator() + userResponse.getResults()[i].toFormattedString());
+//		}
+//
+//		msg("Show amount of credit currently reserved for products...");
+//		ConnectionResponse allocResponse = mainConnection.callProcedure("ShowCurrentAllocations__promBL");
+//
+//		for (int i = 0; i < allocResponse.getResults().length; i++) {
+//			msg(System.lineSeparator() + allocResponse.getResults()[i].toFormattedString());
+//		}
 	}
 
 	/**
@@ -271,19 +267,17 @@ public abstract class BaseChargingDemo {
 	 *
 	 * @param mainConnection
 	 * @param cardId
-	 * @throws IOException
-	 * @throws NoConnectionsException
-	 * @throws ProcCallException
+
 	 */
 	protected static void queryLoyaltyCard(Connection mainConnection, long cardId) throws IOException {
 
 		// Query user #queryUserId...
 		msg("Query card #" + cardId + "...");
-		ConnectionResponse userResponse = mainConnection.callProcedure("FindByLoyaltyCard", cardId);
-
-		for (int i = 0; i < userResponse.getResults().length; i++) {
-			msg(System.lineSeparator() + userResponse.getResults()[i].toFormattedString());
-		}
+//		ConnectionResponse userResponse = mainConnection.callProcedure("FindByLoyaltyCard", cardId);
+//
+//		for (int i = 0; i < userResponse.getResults().length; i++) {
+//			msg(System.lineSeparator() + userResponse.getResults()[i].toFormattedString());
+//		}
 
 	}
 
@@ -302,13 +296,9 @@ public abstract class BaseChargingDemo {
 	 * @param extraMs
 	 * @return true if >=90% of requested throughput was achieved.
 	 * @throws InterruptedException
-	 * @throws IOException
-	 * @throws NoConnectionsException
-	 * @throws ProcCallException
 	 */
 	protected static boolean runKVBenchmark(int userCount, int tpMs, int durationSeconds, int globalQueryFreqSeconds,
-			int jsonsize, Connection mainConnection, int deltaProportion, int extraMs)
-			throws InterruptedException, IOException, NoConnectionsException, ProcCallException {
+			int jsonsize, Connection mainConnection, int deltaProportion, int extraMs) throws InterruptedException {
 
 		long lastGlobalQueryMs = 0;
 
@@ -368,7 +358,7 @@ public abstract class BaseChargingDemo {
 
 					userState[oursession].startTran();
 					userState[oursession].setStatus(UserKVState.STATUS_TRYING_TO_LOCK);
-					mainConnection.callProcedure(userState[oursession], "GetAndLockUser", oursession);
+					//mainConnection.callProcedure(userState[oursession], "GetAndLockUser", oursession);
 					lockCount++;
 
 				} else {
@@ -379,7 +369,7 @@ public abstract class BaseChargingDemo {
 
 				userState[oursession].startTran();
 				userState[oursession].setStatus(UserKVState.STATUS_TRYING_TO_LOCK);
-				mainConnection.callProcedure(userState[oursession], "GetAndLockUser", oursession);
+				//mainConnection.callProcedure(userState[oursession], "GetAndLockUser", oursession);
 				lockCount++;
 
 			} else if (userState[oursession].getUserStatus() == UserKVState.STATUS_LOCKED) {
@@ -393,13 +383,13 @@ public abstract class BaseChargingDemo {
 					// number. For
 					// large values stored as JSON this can have a dramatic effect on network
 					// bandwidth
-					mainConnection.callProcedure(userState[oursession], "UpdateLockedUser", oursession,
-							userState[oursession].getLockId(), getNewLoyaltyCardNumber(r),
-							ExtraUserData.NEW_LOYALTY_NUMBER);
+//					mainConnection.callProcedure(userState[oursession], "UpdateLockedUser", oursession,
+//							userState[oursession].getLockId(), getNewLoyaltyCardNumber(r),
+//							ExtraUserData.NEW_LOYALTY_NUMBER);
 				} else {
 					fullUpdate++;
-					mainConnection.callProcedure(userState[oursession], "UpdateLockedUser", oursession,
-							userState[oursession].getLockId(), getExtraUserDataAsJsonString(jsonsize, gson, r), null);
+//					mainConnection.callProcedure(userState[oursession], "UpdateLockedUser", oursession,
+//							userState[oursession].getLockId(), getExtraUserDataAsJsonString(jsonsize, gson, r), null);
 				}
 
 			}
@@ -422,7 +412,7 @@ public abstract class BaseChargingDemo {
 
 		msg(tranCount + " transactions done...");
 		msg("All entries in queue, waiting for it to drain...");
-		mainConnection.drain();
+		//mainConnection.drain();
 		msg("Queue drained...");
 
 		long transactionsPerMs = tranCount / (System.currentTimeMillis() - startMsRun);
@@ -498,9 +488,6 @@ public abstract class BaseChargingDemo {
 	 *
 	 * @param mainConnection
 	 * @throws IOException
-	 * @throws SQLException
-	 * @throws NoConnectionsException
-	 * @throws ProcCallException
 	 */
 	protected static void unlockAllRecords(Connection mainConnection) throws IOException, SQLException {
 
@@ -525,16 +512,12 @@ public abstract class BaseChargingDemo {
 	 * @param globalQueryFreqSeconds how often we check on global stats and a single
 	 *                               user
 	 * @param mainConnection
-	 * @param extraMS
+
 	 * @return true if within 90% of targeted TPS
-	 * @throws InterruptedException
-	 * @throws IOException
-	 * @throws NoConnectionsException
-	 * @throws ProcCallException
+
 	 */
 	protected static boolean runTransactionBenchmark(int userCount, int tpMs, int durationSeconds,
-			int globalQueryFreqSeconds, Connection mainConnection, int extraMs)
-			throws InterruptedException, IOException, NoConnectionsException, ProcCallException {
+			int globalQueryFreqSeconds, Connection mainConnection, int extraMs) throws InterruptedException {
 
 		// Used to track changes and be unique when we are running multiple threads
 		final long pid = getPid();
@@ -596,8 +579,8 @@ public abstract class BaseChargingDemo {
 
 					AddCreditCallback addCreditCallback = new AddCreditCallback(users[randomuser]);
 
-					mainConnection.callProcedure(addCreditCallback, "AddCredit", randomuser, extraCredit,
-							"AddCreditOnShortage_" + pid + "_" + addCreditCount + "_" + System.currentTimeMillis());
+//					mainConnection.callProcedure(addCreditCallback, "AddCredit", randomuser, extraCredit,
+//							"AddCreditOnShortage_" + pid + "_" + addCreditCount + "_" + System.currentTimeMillis());
 
 				} else {
 
@@ -608,9 +591,9 @@ public abstract class BaseChargingDemo {
 					long unitsUsed = (int) (users[randomuser].currentlyReserved * 0.9);
 					long unitsWanted = r.nextInt(100);
 
-					mainConnection.callProcedure(reportUsageCallback, "ReportQuotaUsage", randomuser, unitsUsed,
-							unitsWanted, users[randomuser].sessionId,
-							"ReportQuotaUsage_" + pid + "_" + reportUsageCount + "_" + System.currentTimeMillis());
+//					mainConnection.callProcedure(reportUsageCallback, "ReportQuotaUsage", randomuser, unitsUsed,
+//							unitsWanted, users[randomuser].sessionId,
+//							"ReportQuotaUsage_" + pid + "_" + reportUsageCount + "_" + System.currentTimeMillis());
 
 				}
 			}
@@ -630,7 +613,7 @@ public abstract class BaseChargingDemo {
 		}
 
 		msg("finished adding transactions to queue");
-		mainConnection.drain();
+		//mainConnection.drain();
 		msg("Queue drained");
 
 		long elapsedTimeMs = System.currentTimeMillis() - startMsRun;
