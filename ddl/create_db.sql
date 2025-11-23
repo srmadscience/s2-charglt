@@ -259,6 +259,68 @@ END;
 -- CREATE PROCEDURE 
 --    PARTITION ON TABLE user_table COLUMN userid
 --    FROM CLASS chargingdemoprocs.UpdateLockedUser;
+
+CREATE OR REPLACE PROCEDURE UpdateLockedUser(p_userid bigint, p_new_lock_id bigint, p_json_payload TEXT, p_delta_operation_name TEXT)
+AS
+DECLARE
+--
+  l_status_byte int := 0; 
+  l_status_string text := '';
+--
+  q_user QUERY(userid BIGINT,user_softlock_expiry TIMESTAMP, user_softlock_sessionid bigint) = 
+     SELECT userid, user_softlock_expiry, user_softlock_sessionid FROM user_table WHERE userid = p_userid;
+--
+  l_found_userid bigint := null;
+  l_user_softlock_expiry timestamp := null;
+  l_user_softlock_sessionid bigint := null;
+--
+BEGIN
+--
+  FOR x IN COLLECT(q_user) LOOP
+--
+    l_found_userid := x.userid;
+    l_user_softlock_expiry := x.user_softlock_expiry;
+    l_user_softlock_sessionid := x.user_softlock_sessionid;
+--
+  END LOOP;
+--
+  IF l_found_userid = p_userid THEN
+--
+    IF l_user_softlock_sessionid = p_new_lock_id OR l_user_softlock_expiry IS NULL OR l_user_softlock_expiry < NOW(6) THEN
+--
+--  Update. Note we havem't implemented deltas yet
+--
+      UPDATE user_table SET user_softlock_sessionid = NULL, user_softlock_expiry = NULL, user_json_object = p_json_payload WHERE userid = p_userid;   
+      l_status_byte = 42; 
+      l_status_string = 'User ' || p_userid || ' updated';
+-- 
+    ELSE
+-- 
+--    Record is locked - STATUS_RECORD_ALREADY_SOFTLOCKED
+--
+      l_status_byte = 53; 
+      l_status_string = 'User ' || p_userid || ' already locked by session '||l_user_softlock_sessionid;
+--
+    END IF;
+--
+  ELSE
+--
+-- No user found. Set STATUS_USER_DOESNT_EXIST
+--
+    l_status_byte = 50; 
+    l_status_string = 'User ' || p_userid || ' does not exist';
+--
+  END IF;
+--
+ECHO SELECT * FROM user_table WHERE userid = p_userid;
+ECHO SELECT user_txn_id, txn_time FROM user_recent_transactions WHERE userid = p_userid ORDER BY txn_time, user_txn_id;
+ECHO SELECT * FROM user_usage_table WHERE userid = p_userid ORDER BY sessionid;
+echo SELECT l_status_byte, l_status_string from dual;
+END;
+
+
+
+
 --    
 -- CREATE PROCEDURE 
 --    PARTITION ON TABLE user_table COLUMN userid

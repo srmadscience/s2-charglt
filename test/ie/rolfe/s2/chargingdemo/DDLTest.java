@@ -16,13 +16,14 @@ import org.junit.jupiter.api.Test;
 
 import java.sql.*;
 
-import static ie.rolfe.s2.chargingdemo.ReferenceData.STATUS_RECORD_HAS_BEEN_SOFTLOCKED;
-import static ie.rolfe.s2.chargingdemo.ReferenceData.STATUS_USER_DOESNT_EXIST;
+import static ie.rolfe.s2.chargingdemo.ReferenceData.*;
 import static org.junit.jupiter.api.Assertions.fail;
 
 class DDLTest {
 
 
+    private static final String TEST_JSON_REPLACE = "NEW_LOYALTY_NUMBER";
+    private static final String TEST_JSON_OBJECT = "{}";
     final long TEST_USER_ID = 42;
     final long BAD_USER_ID = 2;
     final long TEST_SESSION_ID = 12;
@@ -375,6 +376,115 @@ class DDLTest {
         }
 
     }
+
+    @Test
+    void UpdateUserNoUser() {
+        BaseChargingDemo.msg("UpdateUserNoUser");
+        try {
+            CallableStatement cs = connection.prepareCall("call UpdateLockedUser(?,?,?,?)\n");
+            cs.setLong(1, BAD_USER_ID);
+            cs.setLong(2, TEST_SESSION_ID);
+            cs.setString(3,TEST_JSON_OBJECT);
+            cs.setString(4,TEST_JSON_REPLACE);
+            cs.execute();
+
+            int rowCount = 0;
+            long l_status_byte = Long.MIN_VALUE;
+
+            do {
+                try (ResultSet resultSet = cs.getResultSet()) {
+                    if (resultSet != null && hasColumn(resultSet, "l_status_byte")) {
+
+                        while (resultSet.next()) {
+                            rowCount++;
+                            l_status_byte = resultSet.getLong("l_status_byte");
+                            BaseChargingDemo.msg(this.getClass().getName() + ":Found " + l_status_byte);
+                        }
+                    }
+                } catch (SQLException e) {
+                    BaseChargingDemo.msg(e.getMessage());
+                    fail(e);
+                    throw new RuntimeException(e);
+                }
+            } while (cs.getMoreResults());
+
+            if (l_status_byte != STATUS_USER_DOESNT_EXIST) {
+                fail("UpdateUserNoUser: return code should be " + STATUS_USER_DOESNT_EXIST + ". " + " got " + l_status_byte);
+            }
+
+
+        } catch (SQLException e) {
+            BaseChargingDemo.msg(e.getMessage());
+            fail(e);
+            throw new RuntimeException(e);
+        }
+
+    }
+
+    @Test
+    void UpdateUserRealUser() {
+        BaseChargingDemo.msg("UpdateUserRealUser");
+        try {
+
+            //
+            // make sure is unlocked...
+            long lockingSessionId = getLongFromUserTable("user_softlock_sessionid");
+
+            if (lockingSessionId != Long.MIN_VALUE) {
+                fail("GetAndLockUserRealUser: Saw " + lockingSessionId + ", expected null ");
+            }
+
+
+            CallableStatement cs = connection.prepareCall("call UpdateLockedUser(?,?,?,?)\n");
+            cs.setLong(1, TEST_USER_ID);
+            cs.setLong(2, TEST_SESSION_ID);
+            cs.setString(3,TEST_JSON_OBJECT);
+            cs.setString(4,TEST_JSON_REPLACE);
+            cs.execute();
+
+            int rowCount = 0;
+            long l_status_byte = Long.MIN_VALUE;
+
+
+            do {
+                try (ResultSet resultSet = cs.getResultSet()) {
+                    if (resultSet != null && hasColumn(resultSet, "l_status_byte")) {
+
+                        while (resultSet.next()) {
+                            rowCount++;
+                            l_status_byte = resultSet.getLong("l_status_byte");
+                            BaseChargingDemo.msg(this.getClass().getName() + ":Found " + l_status_byte);
+                        }
+                    }
+                } catch (SQLException e) {
+                    BaseChargingDemo.msg(e.getMessage());
+                    fail(e);
+                    throw new RuntimeException(e);
+                }
+            } while (cs.getMoreResults());
+
+            if (l_status_byte != STATUS_OK) {
+                fail("UpdateUserRealUser: return code should be " + STATUS_OK + ". " + " got " + l_status_byte);
+            }
+
+
+            //
+            // See if our session ID is now there...
+            lockingSessionId = getLongFromUserTable("user_softlock_sessionid");
+
+            if (lockingSessionId != Long.MIN_VALUE) {
+                fail("UpdateUserRealUser: Saw " + lockingSessionId + ", expected " + Long.MIN_VALUE);
+            }
+
+        } catch (SQLException e) {
+            BaseChargingDemo.msg(e.getMessage());
+            fail(e);
+            throw new RuntimeException(e);
+        }
+
+    }
+
+
 
     @Test
     void DelUser() {
