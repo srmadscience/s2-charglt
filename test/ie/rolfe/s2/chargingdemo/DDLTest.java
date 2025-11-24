@@ -32,6 +32,8 @@ class DDLTest {
     final long TEST_BALANCE = 1000;
     final long TEST_EXTRA_CREDIT = 333;
     final long TEST_ALLOCATED = 10;
+    final long TEST_WANTED = 20;
+    final long TEST_OVERSPEND = 100000;
     final String[] setupDML = {"INSERT INTO user_table  " +
             "(userid ,user_json_object ,user_last_seen ,user_softlock_sessionid ,user_softlock_expiry, user_balance)" +
             " VALUES " +
@@ -468,6 +470,273 @@ class DDLTest {
     }
 
     @Test
+    void ReportQuotaUsageNoUser() {
+        BaseChargingDemo.msg("ReportQuotaUsageNoUser");
+        try {
+            CallableStatement cs = connection.prepareCall("call ReportQuotaUsage(?,?,?,?,?)\n");
+            cs.setLong(1, BAD_USER_ID);
+            cs.setLong(2, 10);
+            cs.setLong(3, 10);
+            cs.setLong(4, 10);
+            cs.setString(5,"No User");
+            cs.execute();
+
+            int rowCount = 0;
+            long l_status_byte = Long.MIN_VALUE;
+
+            do {
+                try (ResultSet resultSet = cs.getResultSet()) {
+                    if (resultSet != null && hasColumn(resultSet, "l_status_byte")) {
+
+                        while (resultSet.next()) {
+                            rowCount++;
+                            l_status_byte = resultSet.getLong("l_status_byte");
+                            BaseChargingDemo.msg(this.getClass().getName() + ":Found " + l_status_byte);
+                        }
+                    }
+                } catch (SQLException e) {
+                    BaseChargingDemo.msg(e.getMessage());
+                    fail(e);
+                    throw new RuntimeException(e);
+                }
+            } while (cs.getMoreResults());
+
+            if (l_status_byte != STATUS_USER_DOESNT_EXIST) {
+                fail("ReportQuotaUsageNoUser: return code should be " + STATUS_USER_DOESNT_EXIST + ". " + " got " + l_status_byte);
+            }
+
+
+        } catch (SQLException e) {
+            BaseChargingDemo.msg(e.getMessage());
+            fail(e);
+            throw new RuntimeException(e);
+        }
+
+    }
+
+    @Test
+    void ReportQuotaUsageRealUserNegCredit() {
+        BaseChargingDemo.msg("ReportQuotaUsageRealUserNegCredit");
+        try {
+
+final long TEST_SPEND = 1;
+
+            //
+            // make sure balance is TEST_BALANCE
+            long check_balance = getLongFromUserTable("user_balance");
+
+            if (check_balance != TEST_BALANCE) {
+                fail("ReportQuotaUsageRealUserNegCredit: Saw " + check_balance + ", expected " + TEST_BALANCE);
+            }
+
+            CallableStatement cs = connection.prepareCall("call ReportQuotaUsage(?,?,?,?,?)\n");
+            cs.setLong(1, TEST_USER_ID);
+            cs.setLong(2, TEST_OVERSPEND);
+            cs.setLong(3, TEST_WANTED);
+            cs.setLong(4, TEST_SESSION_ID);
+            cs.setString(5,"Neg Credit");
+            cs.execute();
+
+            int rowCount = 0;
+            long l_status_byte = Long.MIN_VALUE;
+
+            do {
+                try (ResultSet resultSet = cs.getResultSet()) {
+                    if (resultSet != null && hasColumn(resultSet, "l_status_byte")) {
+
+                        while (resultSet.next()) {
+                            rowCount++;
+                            l_status_byte = resultSet.getLong("l_status_byte");
+                            BaseChargingDemo.msg(this.getClass().getName() + ":Found " + l_status_byte);
+                        }
+                    }
+                } catch (SQLException e) {
+                    BaseChargingDemo.msg(e.getMessage());
+                    fail(e);
+                    throw new RuntimeException(e);
+                }
+            } while (cs.getMoreResults());
+
+            connection.commit();
+
+            if (l_status_byte != STATUS_NO_MONEY) {
+                fail("ReportQuotaUsageRealUserNegCredit: return code should be " + STATUS_NO_MONEY + ". " + " got " + l_status_byte);
+            }
+
+            //
+            // make sure balance is TEST_BALANCE - TEST_OVERSPEND
+            check_balance = getLongFromUserTable("user_balance");
+
+            if (check_balance != (TEST_BALANCE - TEST_OVERSPEND)) {
+                fail("ReportQuotaUsageRealUserNegCredit: Saw " + check_balance + ", expected " + (TEST_BALANCE - TEST_OVERSPEND));
+            }
+
+            //
+            // make sure allocated is Long.MIN_VALUE (null).
+            long check_allocated = getLongFromUserTable("allocated_amount");
+
+            if (check_allocated !=Long.MIN_VALUE) {
+                fail("ReportQuotaUsageRealUserNegCredit: Saw " + check_balance + ", expected null");
+            }
+
+        } catch (SQLException e) {
+            BaseChargingDemo.msg(e.getMessage());
+            fail(e);
+            throw new RuntimeException(e);
+        }
+
+    }
+
+    @Test
+    void ReportQuotaUsageRealUserSomeUnits() {
+        BaseChargingDemo.msg("ReportQuotaUsageRealUserSomeUnits");
+        try {
+
+            final long TEST_SPEND = 1;
+
+            //
+            // make sure balance is TEST_BALANCE
+            long check_balance = getLongFromUserTable("user_balance");
+
+            if (check_balance != TEST_BALANCE) {
+                fail("ReportQuotaUsageRealUserSomeUnits: Saw " + check_balance + ", expected " + TEST_BALANCE);
+            }
+
+            CallableStatement cs = connection.prepareCall("call ReportQuotaUsage(?,?,?,?,?)\n");
+            cs.setLong(1, TEST_USER_ID);
+            cs.setLong(2, TEST_SPEND);
+            cs.setLong(3, TEST_BALANCE * 10);
+            cs.setLong(4, TEST_SESSION_ID);
+            cs.setString(5,"Some Units");
+            cs.execute();
+
+            int rowCount = 0;
+            long l_status_byte = Long.MIN_VALUE;
+
+            do {
+                try (ResultSet resultSet = cs.getResultSet()) {
+                    if (resultSet != null && hasColumn(resultSet, "l_status_byte")) {
+
+                        while (resultSet.next()) {
+                            rowCount++;
+                            l_status_byte = resultSet.getLong("l_status_byte");
+                            BaseChargingDemo.msg(this.getClass().getName() + ":Found " + l_status_byte);
+                        }
+                    }
+                } catch (SQLException e) {
+                    BaseChargingDemo.msg(e.getMessage());
+                    fail(e);
+                    throw new RuntimeException(e);
+                }
+            } while (cs.getMoreResults());
+
+            connection.commit();
+
+            if (l_status_byte != STATUS_SOME_UNITS_ALLOCATED) {
+                fail("ReportQuotaUsageRealUserSomeUnits: return code should be " + STATUS_SOME_UNITS_ALLOCATED + ". " + " got " + l_status_byte);
+            }
+
+            //
+            // make sure balance is TEST_BALANCE - TEST_SPEND
+            check_balance = getLongFromUserTable("user_balance");
+
+            if (check_balance != (TEST_BALANCE - TEST_SPEND)) {
+                fail("ReportQuotaUsageRealUserSomeUnits: Saw " + check_balance + ", expected " + (TEST_BALANCE - TEST_SPEND));
+            }
+
+            //
+            // make sure allocated is 999
+            long check_allocated = getLongFromUserTable("allocated_amount");
+
+            if (check_allocated != (TEST_BALANCE - TEST_SPEND)) {
+                fail("ReportQuotaUsageRealUserNegCredit: Saw " + check_balance + ", expected " + (TEST_BALANCE - TEST_SPEND));
+            }
+
+        } catch (SQLException e) {
+            BaseChargingDemo.msg(e.getMessage());
+            fail(e);
+            throw new RuntimeException(e);
+        }
+
+    }
+
+
+    @Test
+    void ReportQuotaUsageRealAllUnitsAllocated() {
+        BaseChargingDemo.msg("ReportQuotaUsageRealUserNegCredit");
+        try {
+
+            final long TEST_SPEND = 1;
+
+            //
+            // make sure balance is TEST_BALANCE
+            long check_balance = getLongFromUserTable("user_balance");
+
+            if (check_balance != TEST_BALANCE) {
+                fail("ReportQuotaUsageRealUserNegCredit: Saw " + check_balance + ", expected " + TEST_BALANCE);
+            }
+
+            CallableStatement cs = connection.prepareCall("call ReportQuotaUsage(?,?,?,?,?)\n");
+            cs.setLong(1, TEST_USER_ID);
+            cs.setLong(2, TEST_SPEND);
+            cs.setLong(3, TEST_ALLOCATED);
+            cs.setLong(4, TEST_SESSION_ID);
+            cs.setString(5,"All Units");
+            cs.execute();
+
+            int rowCount = 0;
+            long l_status_byte = Long.MIN_VALUE;
+
+            do {
+                try (ResultSet resultSet = cs.getResultSet()) {
+                    if (resultSet != null && hasColumn(resultSet, "l_status_byte")) {
+
+                        while (resultSet.next()) {
+                            rowCount++;
+                            l_status_byte = resultSet.getLong("l_status_byte");
+                            BaseChargingDemo.msg(this.getClass().getName() + ":Found " + l_status_byte);
+                        }
+                    }
+                } catch (SQLException e) {
+                    BaseChargingDemo.msg(e.getMessage());
+                    fail(e);
+                    throw new RuntimeException(e);
+                }
+            } while (cs.getMoreResults());
+
+            connection.commit();
+
+            if (l_status_byte != STATUS_ALL_UNITS_ALLOCATED) {
+                fail("ReportQuotaUsageRealUserNegCredit: return code should be " + STATUS_ALL_UNITS_ALLOCATED + ". " + " got " + l_status_byte);
+            }
+
+            //
+            // make sure balance is TEST_BALANCE - TEST_SPEND
+            check_balance = getLongFromUserTable("user_balance");
+
+            if (check_balance != (TEST_BALANCE - TEST_SPEND)) {
+                fail("ReportQuotaUsageRealUserNegCredit: Saw " + check_balance + ", expected " + (TEST_BALANCE - TEST_SPEND));
+            }
+
+            //
+            // make sure allocated is 0
+            long check_allocated = getLongFromUserTable("allocated_amount");
+
+            if (check_allocated !=TEST_ALLOCATED) {
+                fail("ReportQuotaUsageRealUserNegCredit: Saw " + check_balance + ", expected "+ TEST_ALLOCATED);
+            }
+
+        } catch (SQLException e) {
+            BaseChargingDemo.msg(e.getMessage());
+            fail(e);
+            throw new RuntimeException(e);
+        }
+
+    }
+
+
+
+    @Test
     void AddCreditRealUser() {
         BaseChargingDemo.msg("AddCreditRealUser");
         final String ADD_CREDIT_TX= "AddCredit1";
@@ -840,7 +1109,7 @@ class DDLTest {
 
             final String TEST_TXN_ID = "Test TXN UpsertUser";
             // make sure exists...
-            long existingUserid = getLongFromUserTable("userid", NEW_USER_ID);
+            long existingUserid = getLongFromUserTable("userid", NEW_USER_ID,false);
 
             if (existingUserid != Long.MIN_VALUE) {
                 fail("UpsertUserNewUser: Test user found at start");
@@ -882,7 +1151,7 @@ class DDLTest {
 
 
             // make sure balance is TEST_BALANCE * 2...
-            long existing_balance = getLongFromUserTable("user_balance",NEW_USER_ID);
+            long existing_balance = getLongFromUserTable("user_balance",NEW_USER_ID,false);
 
             if (existing_balance != TEST_BALANCE * 2) {
                 fail("UpsertUserNewUser: Test balance wrong at end");
@@ -928,7 +1197,7 @@ class DDLTest {
 
             //
             // Sanity check - is balance still 2 * ?
-            existing_balance = getLongFromUserTable("user_balance",NEW_USER_ID);
+            existing_balance = getLongFromUserTable("user_balance",NEW_USER_ID, false);
 
             if (existing_balance != TEST_BALANCE * 2) {
                 fail("UpsertUserNewUser: Test balance wrong at end " + existing_balance);
@@ -959,12 +1228,13 @@ class DDLTest {
     }
 
     private long getLongFromUserTable(String fieldName) {
-        return getLongFromUserTable(fieldName, TEST_USER_ID);
+        return getLongFromUserTable(fieldName, TEST_USER_ID, false);
     }
 
-    private long getLongFromUserTable(String fieldName, long userId) {
+    private long getLongFromUserTable(String fieldName, long userId, boolean addValues) {
 
         long value = Long.MIN_VALUE;
+        long totalValue = Long.MIN_VALUE;
 
         try {
             CallableStatement cs = connection.prepareCall("call GetUser(?)\n");
@@ -983,6 +1253,7 @@ class DDLTest {
                             if (resultSet.wasNull()) {
                                 value = Long.MIN_VALUE;
                             }
+                            totalValue += value;
                         }
                     }
                 } catch (SQLException e) {
@@ -998,6 +1269,10 @@ class DDLTest {
             throw new RuntimeException(e);
         }
 
+        if (addValues) {
+            return totalValue;
+        }
         return value;
     }
+
 }
