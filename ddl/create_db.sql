@@ -7,11 +7,12 @@ CREATE rowstore table user_table
 ,user_last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ,user_softlock_sessionid bigint 
 ,user_softlock_expiry TIMESTAMP
-,user_balance bigint not null);
+,user_balance bigint not null
+,shard key (userid));
 
 create index ut_del on user_table(user_last_seen);
 
-create table user_usage_table
+create rowstore table user_usage_table
 (userid bigint not null
 ,allocated_amount bigint not null
 ,sessionid bigint  not null
@@ -24,7 +25,7 @@ CREATE INDEX ust_del_idx1 ON user_usage_table(lastdate);
 
 CREATE INDEX uut_ix1 ON user_usage_table(userid, lastdate);
 
-create table user_recent_transactions
+create rowstore table user_recent_transactions
 (userid bigint not null 
 ,user_txn_id varchar(128) NOT NULL
 ,txn_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP not null 
