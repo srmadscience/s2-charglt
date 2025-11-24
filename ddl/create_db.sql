@@ -1,4 +1,3 @@
-CREATE DATABASE charglt;
  
 USE charglt;
 
@@ -12,8 +11,6 @@ CREATE rowstore table user_table
 
 create index ut_del on user_table(user_last_seen);
 
--- create index ut_loyaltycard on user_table (field(user_json_object, 'loyaltySchemeNumber'));
-
 create table user_usage_table
 (userid bigint not null
 ,allocated_amount bigint not null
@@ -22,8 +19,6 @@ create table user_usage_table
 ,primary key (userid, sessionid)
 ,shard key(userid));
 
-
--- USING TTL 180 MINUTES ON COLUMN lastdate;
 
 CREATE INDEX ust_del_idx1 ON user_usage_table(lastdate);
 
@@ -43,30 +38,13 @@ create table user_recent_transactions
 
 CREATE INDEX urt_del_idx ON user_recent_transactions(userid, txn_time,user_txn_id) ;
 
---CREATE INDEX urt_del_idx2 ON user_recent_transactions(userid, txn_time)  WHERE NOT MIGRATING;
-
 CREATE INDEX urt_del_idx3 ON user_recent_transactions(txn_time);
 
---CREATE INDEX urt_del_idx4 ON user_recent_transactions(txn_time) WHERE NOT MIGRATING;
-
---CREATE STREAM user_financial_events 
---EXPORT TO TOPIC user_financial_events 
---WITH KEY (userid)
---partition on column userid
---(userid bigint not null 
---,amount bigint not null
---,user_txn_id varchar(128) not null
---,message varchar(80) not null);
 
 create view current_locks as
 select count(*) how_many 
 from user_table 
 where user_softlock_expiry is not null;
-
-create view user_balance as
-select userid, sum(amount) balance
-from user_financial_events
-group by userid;
 
 create view allocated_credit as 
 select sum(allocated_amount) allocated_amount 
@@ -77,7 +55,6 @@ select userid, count(*) how_many
 from user_usage_table
 group by  userid;
 
--- create index uss_ix1 on users_sessions (how_many) WHERE how_many > 1;
 
 create view recent_activity_out as
 select DATE_TRUNC('minute',txn_time) txn_time

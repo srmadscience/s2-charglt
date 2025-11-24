@@ -1,5 +1,7 @@
 DELIMITER //
 
+USE charglt; 
+
 create or replace procedure GetUsersWithMultipleSessions()
 AS 
 BEGIN

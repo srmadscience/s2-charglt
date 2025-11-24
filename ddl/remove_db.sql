@@ -1,5 +1,5 @@
-USE charglt;
 
+USE charglt;
 
 drop procedure GetUsersWithMultipleSessions;
 drop procedure showTransactions;
@@ -11,16 +11,10 @@ drop PROCEDURE DelUser;
 drop PROCEDURE ReportQuotaUsage;
 drop PROCEDURE AddCredit;
 
-
-CREATE DATABASE charglt;
- 
-USE charglt;
-
 drop table user_table;
 drop table user_usage_table;
 drop table user_recent_transactions;
 drop view current_locks;
-drop view user_balance;
 drop view allocated_credit ;
 drop view users_sessions ;
 drop view recent_activity_out;
@@ -29,5 +23,3 @@ drop view cluster_activity_by_users ;
 drop view cluster_activity ;
 drop view last_cluster_activity ;
 drop view cluster_users ;
-;
-;
