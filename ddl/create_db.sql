@@ -422,9 +422,86 @@ END;
 --    PARTITION ON TABLE user_table COLUMN userid
 --    FROM CLASS chargingdemoprocs.ReportQuotaUsage;  
 --    
+
+
 -- CREATE PROCEDURE 
 --    PARTITION ON TABLE user_table COLUMN userid
 --    FROM CLASS chargingdemoprocs.AddCredit;  
 -- 
 -- 
--- END_OF_BATCH
+
+CREATE OR REPLACE PROCEDURE AddCredit(p_userid bigint, p_extra_credit bigint, p_txnId TEXT)
+AS
+DECLARE
+--
+  l_status_byte int := 0;
+  l_status_string text := '';
+--
+  q_user QUERY(userid BIGINT) =
+     SELECT userid FROM user_table WHERE userid = p_userid;
+--
+  q_txn QUERY(user_txn_id BIGINT) =
+     SELECT user_txn_id FROM user_recent_transactions WHERE userid = p_userid AND user_txn_id = p_txnId;
+--
+  l_found_userid bigint := null;
+  l_found_txn_id bigint := null;
+--
+BEGIN
+--
+  FOR x IN COLLECT(q_user) LOOP
+--
+    l_found_userid := x.userid;
+--
+  END LOOP;
+--
+--
+  FOR y IN COLLECT(q_txn) LOOP
+--
+    l_found_txn_id := y.user_txn_id;
+--
+  END LOOP;
+--
+  IF l_found_txn_id = p_txnId THEN
+--
+-- Txn has already happened
+--
+    l_status_byte = 46;
+    l_status_string = 'Txn ' || p_txnId || ' already happened';
+--
+  ELSE
+--
+    IF l_found_userid = p_userid THEN
+--
+-- Update and report with as STATUS_CREDIT_ADDED
+--
+      UPDATE user_table SET user_balance = user_balance + p_extra_credit;
+      INSERT INTO user_recent_transactions  
+        (userid, user_txn_id, txn_time, approved_amount,spent_amount,purpose) 
+      VALUES 
+        (p_userid,p_txnId,NOW(),0,p_extra_credit,'Add Credit');       
+--
+--    Delete old TX records
+--
+      DELETE FROM user_recent_transactions 
+      WHERE userid = p_userid
+      AND txn_time < DATE_ADD(NOW(), INTERVAL -1 SECOND);
+--
+      l_status_byte = 56;
+      l_status_string = p_extra_credit || ' added by Txn ' || p_txnId;
+--
+    ELSE
+--
+-- No user found. Set STATUS_USER_DOESNT_EXIST
+--
+      l_status_byte = 50;
+      l_status_string = 'User ' || p_userid || ' does not exist';
+--
+    END IF;
+--
+  END IF;
+--
+ECHO SELECT * FROM user_table WHERE userid = p_userid;
+ECHO SELECT * FROM user_usage_table WHERE userid = p_userid ORDER BY sessionid;
+echo SELECT l_status_byte, l_status_string from dual;
+END;
+

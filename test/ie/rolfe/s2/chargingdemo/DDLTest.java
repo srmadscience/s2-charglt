@@ -30,6 +30,7 @@ class DDLTest {
     final long TEST_SESSION_ID = 12;
     final long BAD_SESSION_ID = 13;
     final long TEST_BALANCE = 1000;
+    final long TEST_EXTRA_CREDIT = 333;
     final long TEST_ALLOCATED = 10;
     final String[] setupDML = {"INSERT INTO user_table  " +
             "(userid ,user_json_object ,user_last_seen ,user_softlock_sessionid ,user_softlock_expiry, user_balance)" +
@@ -422,6 +423,136 @@ class DDLTest {
         }
 
     }
+
+    @Test
+    void AddCreditNoUser() {
+        BaseChargingDemo.msg("AddCreditNoUser");
+        try {
+            CallableStatement cs = connection.prepareCall("call AddCredit(?,?,?)\n");
+            cs.setLong(1, BAD_USER_ID);
+            cs.setLong(2, TEST_EXTRA_CREDIT);
+            cs.setString(3,"Add Credit 1");
+             cs.execute();
+
+            int rowCount = 0;
+            long l_status_byte = Long.MIN_VALUE;
+
+            do {
+                try (ResultSet resultSet = cs.getResultSet()) {
+                    if (resultSet != null && hasColumn(resultSet, "l_status_byte")) {
+
+                        while (resultSet.next()) {
+                            rowCount++;
+                            l_status_byte = resultSet.getLong("l_status_byte");
+                            BaseChargingDemo.msg(this.getClass().getName() + ":Found " + l_status_byte);
+                        }
+                    }
+                } catch (SQLException e) {
+                    BaseChargingDemo.msg(e.getMessage());
+                    fail(e);
+                    throw new RuntimeException(e);
+                }
+            } while (cs.getMoreResults());
+
+            if (l_status_byte != STATUS_USER_DOESNT_EXIST) {
+                fail("AddCreditNoUser: return code should be " + STATUS_USER_DOESNT_EXIST + ". " + " got " + l_status_byte);
+            }
+
+
+        } catch (SQLException e) {
+            BaseChargingDemo.msg(e.getMessage());
+            fail(e);
+            throw new RuntimeException(e);
+        }
+
+    }
+
+    @Test
+    void AddCreditRealUser() {
+        BaseChargingDemo.msg("AddCreditRealUser");
+        final String ADD_CREDIT_TX= "AddCredit1";
+        try {
+            CallableStatement cs = connection.prepareCall("call AddCredit(?,?,?)\n");
+            cs.setLong(1, TEST_USER_ID  );
+            cs.setLong(2, TEST_EXTRA_CREDIT);
+            cs.setString(3,ADD_CREDIT_TX);
+            cs.execute();
+
+            int rowCount = 0;
+            long l_status_byte = Long.MIN_VALUE;
+
+            do {
+                try (ResultSet resultSet = cs.getResultSet()) {
+                    if (resultSet != null && hasColumn(resultSet, "l_status_byte")) {
+
+                        while (resultSet.next()) {
+                            rowCount++;
+                            l_status_byte = resultSet.getLong("l_status_byte");
+                            BaseChargingDemo.msg(this.getClass().getName() + ":Found " + l_status_byte);
+                        }
+                    }
+                } catch (SQLException e) {
+                    BaseChargingDemo.msg(e.getMessage());
+                    fail(e);
+                    throw new RuntimeException(e);
+                }
+            } while (cs.getMoreResults());
+
+            if (l_status_byte != STATUS_CREDIT_ADDED) {
+                fail("AddCreditRealUser: return code should be " + STATUS_CREDIT_ADDED + ". " + " got " + l_status_byte);
+            }
+
+            //
+            // See if our balance has updated...
+            long newBalance  = getLongFromUserTable("user_balance");
+
+            if (newBalance != TEST_EXTRA_CREDIT + TEST_BALANCE) {
+                fail("UpdateUserRealUser: Saw " + newBalance + ", expected " + ( TEST_EXTRA_CREDIT + TEST_BALANCE));
+            }
+
+            //
+            // Try transaction again
+            //
+            cs.setLong(1, TEST_USER_ID  );
+            cs.setLong(2, TEST_EXTRA_CREDIT);
+            cs.setString(3,ADD_CREDIT_TX);
+            cs.execute();
+
+             rowCount = 0;
+             l_status_byte = Long.MIN_VALUE;
+
+            do {
+                try (ResultSet resultSet = cs.getResultSet()) {
+                    if (resultSet != null && hasColumn(resultSet, "l_status_byte")) {
+
+                        while (resultSet.next()) {
+                            rowCount++;
+                            l_status_byte = resultSet.getLong("l_status_byte");
+                            BaseChargingDemo.msg(this.getClass().getName() + ":Found " + l_status_byte);
+                        }
+                    }
+                } catch (SQLException e) {
+                    BaseChargingDemo.msg(e.getMessage());
+                    fail(e);
+                    throw new RuntimeException(e);
+                }
+            } while (cs.getMoreResults());
+
+            if (l_status_byte != STATUS_TXN_ALREADY_HAPPENED) {
+                fail("AddCreditRealUser: return code should be " + STATUS_TXN_ALREADY_HAPPENED + ". " + " got " + l_status_byte);
+            }
+
+
+
+        } catch (SQLException e) {
+            BaseChargingDemo.msg(e.getMessage());
+            fail(e);
+            throw new RuntimeException(e);
+        }
+
+    }
+
+
 
     @Test
     void UpdateUserRealUser() {
