@@ -389,8 +389,8 @@ class DDLTest {
             CallableStatement cs = connection.prepareCall("call UpdateLockedUser(?,?,?,?)\n");
             cs.setLong(1, BAD_USER_ID);
             cs.setLong(2, TEST_SESSION_ID);
-            cs.setString(3,TEST_JSON_OBJECT);
-            cs.setString(4,TEST_JSON_REPLACE);
+            cs.setString(3, TEST_JSON_OBJECT);
+            cs.setString(4, TEST_JSON_REPLACE);
             cs.execute();
 
             int rowCount = 0;
@@ -433,8 +433,8 @@ class DDLTest {
             CallableStatement cs = connection.prepareCall("call AddCredit(?,?,?)\n");
             cs.setLong(1, BAD_USER_ID);
             cs.setLong(2, TEST_EXTRA_CREDIT);
-            cs.setString(3,"Add Credit 1");
-             cs.execute();
+            cs.setString(3, "Add Credit 1");
+            cs.execute();
 
             int rowCount = 0;
             long l_status_byte = Long.MIN_VALUE;
@@ -478,7 +478,7 @@ class DDLTest {
             cs.setLong(2, 10);
             cs.setLong(3, 10);
             cs.setLong(4, 10);
-            cs.setString(5,"No User");
+            cs.setString(5, "No User");
             cs.execute();
 
             int rowCount = 0;
@@ -519,7 +519,7 @@ class DDLTest {
         BaseChargingDemo.msg("ReportQuotaUsageRealUserNegCredit");
         try {
 
-final long TEST_SPEND = 1;
+            final long TEST_SPEND = 1;
 
             //
             // make sure balance is TEST_BALANCE
@@ -534,7 +534,7 @@ final long TEST_SPEND = 1;
             cs.setLong(2, TEST_OVERSPEND);
             cs.setLong(3, TEST_WANTED);
             cs.setLong(4, TEST_SESSION_ID);
-            cs.setString(5,"Neg Credit");
+            cs.setString(5, "Neg Credit");
             cs.execute();
 
             int rowCount = 0;
@@ -575,7 +575,7 @@ final long TEST_SPEND = 1;
             // make sure allocated is Long.MIN_VALUE (null).
             long check_allocated = getLongFromUserTable("allocated_amount");
 
-            if (check_allocated !=Long.MIN_VALUE) {
+            if (check_allocated != Long.MIN_VALUE) {
                 fail("ReportQuotaUsageRealUserNegCredit: Saw " + check_balance + ", expected null");
             }
 
@@ -607,7 +607,7 @@ final long TEST_SPEND = 1;
             cs.setLong(2, TEST_SPEND);
             cs.setLong(3, TEST_BALANCE * 10);
             cs.setLong(4, TEST_SESSION_ID);
-            cs.setString(5,"Some Units");
+            cs.setString(5, "Some Units");
             cs.execute();
 
             int rowCount = 0;
@@ -681,7 +681,7 @@ final long TEST_SPEND = 1;
             cs.setLong(2, TEST_SPEND);
             cs.setLong(3, TEST_ALLOCATED);
             cs.setLong(4, TEST_SESSION_ID);
-            cs.setString(5,"All Units");
+            cs.setString(5, "All Units");
             cs.execute();
 
             int rowCount = 0;
@@ -722,8 +722,8 @@ final long TEST_SPEND = 1;
             // make sure allocated is 0
             long check_allocated = getLongFromUserTable("allocated_amount");
 
-            if (check_allocated !=TEST_ALLOCATED) {
-                fail("ReportQuotaUsageRealUserNegCredit: Saw " + check_balance + ", expected "+ TEST_ALLOCATED);
+            if (check_allocated != TEST_ALLOCATED) {
+                fail("ReportQuotaUsageRealUserNegCredit: Saw " + check_balance + ", expected " + TEST_ALLOCATED);
             }
 
         } catch (SQLException e) {
@@ -735,16 +735,15 @@ final long TEST_SPEND = 1;
     }
 
 
-
     @Test
     void AddCreditRealUser() {
         BaseChargingDemo.msg("AddCreditRealUser");
-        final String ADD_CREDIT_TX= "AddCredit1";
+        final String ADD_CREDIT_TX = "AddCredit1";
         try {
             CallableStatement cs = connection.prepareCall("call AddCredit(?,?,?)\n");
-            cs.setLong(1, TEST_USER_ID  );
+            cs.setLong(1, TEST_USER_ID);
             cs.setLong(2, TEST_EXTRA_CREDIT);
-            cs.setString(3,ADD_CREDIT_TX);
+            cs.setString(3, ADD_CREDIT_TX);
             cs.execute();
 
             int rowCount = 0;
@@ -773,22 +772,22 @@ final long TEST_SPEND = 1;
 
             //
             // See if our balance has updated...
-            long newBalance  = getLongFromUserTable("user_balance");
+            long newBalance = getLongFromUserTable("user_balance");
 
             if (newBalance != TEST_EXTRA_CREDIT + TEST_BALANCE) {
-                fail("UpdateUserRealUser: Saw " + newBalance + ", expected " + ( TEST_EXTRA_CREDIT + TEST_BALANCE));
+                fail("UpdateUserRealUser: Saw " + newBalance + ", expected " + (TEST_EXTRA_CREDIT + TEST_BALANCE));
             }
 
             //
             // Try transaction again
             //
-            cs.setLong(1, TEST_USER_ID  );
+            cs.setLong(1, TEST_USER_ID);
             cs.setLong(2, TEST_EXTRA_CREDIT);
-            cs.setString(3,ADD_CREDIT_TX);
+            cs.setString(3, ADD_CREDIT_TX);
             cs.execute();
 
-             rowCount = 0;
-             l_status_byte = Long.MIN_VALUE;
+            rowCount = 0;
+            l_status_byte = Long.MIN_VALUE;
 
             do {
                 try (ResultSet resultSet = cs.getResultSet()) {
@@ -812,7 +811,6 @@ final long TEST_SPEND = 1;
             }
 
 
-
         } catch (SQLException e) {
             BaseChargingDemo.msg(e.getMessage());
             fail(e);
@@ -820,7 +818,6 @@ final long TEST_SPEND = 1;
         }
 
     }
-
 
 
     @Test
@@ -840,8 +837,8 @@ final long TEST_SPEND = 1;
             CallableStatement cs = connection.prepareCall("call UpdateLockedUser(?,?,?,?)\n");
             cs.setLong(1, TEST_USER_ID);
             cs.setLong(2, TEST_SESSION_ID);
-            cs.setString(3,TEST_JSON_OBJECT);
-            cs.setString(4,TEST_JSON_REPLACE);
+            cs.setString(3, TEST_JSON_OBJECT);
+            cs.setString(4, TEST_JSON_REPLACE);
             cs.execute();
 
             int rowCount = 0;
@@ -909,8 +906,8 @@ final long TEST_SPEND = 1;
             cs = connection.prepareCall("call UpdateLockedUser(?,?,?,?)\n");
             cs.setLong(1, TEST_USER_ID);
             cs.setLong(2, TEST_SESSION_ID);
-            cs.setString(3,TEST_JSON_OBJECT);
-            cs.setString(4,TEST_JSON_REPLACE);
+            cs.setString(3, TEST_JSON_OBJECT);
+            cs.setString(4, TEST_JSON_REPLACE);
             cs.execute();
 
             int rowCount = 0;
@@ -937,8 +934,6 @@ final long TEST_SPEND = 1;
             if (l_status_byte != STATUS_RECORD_ALREADY_SOFTLOCKED) {
                 fail("UpdateUserRealUser: return code should be " + STATUS_RECORD_ALREADY_SOFTLOCKED + ". " + " got " + l_status_byte);
             }
-
-
 
 
         } catch (SQLException e) {
@@ -1006,10 +1001,10 @@ final long TEST_SPEND = 1;
             CallableStatement cs = connection.prepareCall("call UpsertUser(?,?,?,?,?,?)\n");
             cs.setLong(1, TEST_USER_ID);
             cs.setLong(2, TEST_BALANCE * 2);
-            cs.setString(3,TEST_JSON_OBJECT);
-            cs.setString(4,"Test: UpsertUserExistingUser");
+            cs.setString(3, TEST_JSON_OBJECT);
+            cs.setString(4, "Test: UpsertUserExistingUser");
             cs.setTimestamp(5, new Timestamp(System.currentTimeMillis()));
-            cs.setString(6,TEST_TXN_ID);
+            cs.setString(6, TEST_TXN_ID);
             cs.execute();
 
             int rowCount = 0;
@@ -1051,15 +1046,15 @@ final long TEST_SPEND = 1;
             // Now try same TX again, but with 3x balance
             //
             cs.setLong(1, TEST_USER_ID);
-            cs.setLong(2, TEST_BALANCE * 3 ); // <- NOTE
-            cs.setString(3,TEST_JSON_OBJECT);
-            cs.setString(4,"Test: UpsertUserExistingUser");
+            cs.setLong(2, TEST_BALANCE * 3); // <- NOTE
+            cs.setString(3, TEST_JSON_OBJECT);
+            cs.setString(4, "Test: UpsertUserExistingUser");
             cs.setTimestamp(5, new Timestamp(System.currentTimeMillis()));
-            cs.setString(6,TEST_TXN_ID);
+            cs.setString(6, TEST_TXN_ID);
             cs.execute();
 
-             rowCount = 0;
-             l_status_byte = Long.MIN_VALUE;
+            rowCount = 0;
+            l_status_byte = Long.MIN_VALUE;
 
 
             do {
@@ -1092,14 +1087,12 @@ final long TEST_SPEND = 1;
             }
 
 
-
         } catch (SQLException e) {
             BaseChargingDemo.msg(e.getMessage());
             fail(e);
             throw new RuntimeException(e);
         }
     }
-
 
 
     @Test
@@ -1109,7 +1102,7 @@ final long TEST_SPEND = 1;
 
             final String TEST_TXN_ID = "Test TXN UpsertUser";
             // make sure exists...
-            long existingUserid = getLongFromUserTable("userid", NEW_USER_ID,false);
+            long existingUserid = getLongFromUserTable("userid", NEW_USER_ID, false);
 
             if (existingUserid != Long.MIN_VALUE) {
                 fail("UpsertUserNewUser: Test user found at start");
@@ -1118,10 +1111,10 @@ final long TEST_SPEND = 1;
             CallableStatement cs = connection.prepareCall("call UpsertUser(?,?,?,?,?,?)\n");
             cs.setLong(1, NEW_USER_ID);
             cs.setLong(2, TEST_BALANCE * 2);
-            cs.setString(3,TEST_JSON_OBJECT);
-            cs.setString(4,"Test: UpsertUserExistingUser");
+            cs.setString(3, TEST_JSON_OBJECT);
+            cs.setString(4, "Test: UpsertUserExistingUser");
             cs.setTimestamp(5, new Timestamp(System.currentTimeMillis()));
-            cs.setString(6,TEST_TXN_ID);
+            cs.setString(6, TEST_TXN_ID);
             cs.execute();
 
             int rowCount = 0;
@@ -1151,7 +1144,7 @@ final long TEST_SPEND = 1;
 
 
             // make sure balance is TEST_BALANCE * 2...
-            long existing_balance = getLongFromUserTable("user_balance",NEW_USER_ID,false);
+            long existing_balance = getLongFromUserTable("user_balance", NEW_USER_ID, false);
 
             if (existing_balance != TEST_BALANCE * 2) {
                 fail("UpsertUserNewUser: Test balance wrong at end");
@@ -1163,11 +1156,11 @@ final long TEST_SPEND = 1;
             // Now try same TX again, but with 3x balance
             //
             cs.setLong(1, NEW_USER_ID);
-            cs.setLong(2, TEST_BALANCE * 3 ); // <- NOTE
-            cs.setString(3,TEST_JSON_OBJECT);
-            cs.setString(4,"Test: UpsertUserExistingUser");
+            cs.setLong(2, TEST_BALANCE * 3); // <- NOTE
+            cs.setString(3, TEST_JSON_OBJECT);
+            cs.setString(4, "Test: UpsertUserExistingUser");
             cs.setTimestamp(5, new Timestamp(System.currentTimeMillis()));
-            cs.setString(6,TEST_TXN_ID);
+            cs.setString(6, TEST_TXN_ID);
             cs.execute();
 
             rowCount = 0;
@@ -1197,12 +1190,11 @@ final long TEST_SPEND = 1;
 
             //
             // Sanity check - is balance still 2 * ?
-            existing_balance = getLongFromUserTable("user_balance",NEW_USER_ID, false);
+            existing_balance = getLongFromUserTable("user_balance", NEW_USER_ID, false);
 
             if (existing_balance != TEST_BALANCE * 2) {
                 fail("UpsertUserNewUser: Test balance wrong at end " + existing_balance);
             }
-
 
 
         } catch (SQLException e) {
@@ -1211,8 +1203,6 @@ final long TEST_SPEND = 1;
             throw new RuntimeException(e);
         }
     }
-
-
 
 
     private boolean hasColumn(ResultSet resultSet, String columnName) throws SQLException {

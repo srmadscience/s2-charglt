@@ -14,28 +14,19 @@
  */
 package ie.rolfe.s2.chargingdemo;
 
+import com.google.gson.Gson;
+import com.singlestore.jdbc.Connection;
+import com.singlestore.jdbc.Statement;
+import ie.rolfe.s2.chargingdemo.callbacks.AddCreditCallback;
+import ie.rolfe.s2.chargingdemo.callbacks.ReportQuotaUsageCallback;
+import ie.rolfe.s2.chargingdemo.callbacks.UserKVState;
+import org.voltdb.voltutil.stats.SafeHistogramCache;
+
 import java.io.IOException;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
+import java.sql.*;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Random;
-
-import ie.rolfe.s2.chargingdemo.callbacks.AddCreditCallback;
-import ie.rolfe.s2.chargingdemo.callbacks.ComplainOnErrorCallback;
-import ie.rolfe.s2.chargingdemo.callbacks.ReportQuotaUsageCallback;
-import ie.rolfe.s2.chargingdemo.callbacks.UserKVState;
-import com.singlestore.jdbc.Connection;
-//import com.singlestore.jdbc.ConnectionConfig;
-//import com.singlestore.jdbc.ConnectionFactory;
-//import com.singlestore.jdbc.ConnectionResponse;
-//import com.singlestore.jdbc.NoConnectionsException;
-//import com.singlestore.jdbc.ProcCallException;
-import org.voltdb.voltutil.stats.SafeHistogramCache;
-
-import com.google.gson.Gson;
-import com.singlestore.jdbc.Statement;
 
 //import chargingdemoprocs.ExtraUserData;
 //import chargingdemoprocs.ReferenceData;
@@ -45,205 +36,215 @@ import com.singlestore.jdbc.Statement;
  */
 public abstract class BaseChargingDemo {
 
-	public static final long GENERIC_QUERY_USER_ID = 42;
-	public static final int HISTOGRAM_SIZE_MS = 1000000;
+    public static final long GENERIC_QUERY_USER_ID = 42;
+    public static final int HISTOGRAM_SIZE_MS = 1000000;
 
-	public static final String REPORT_QUOTA_USAGE = "ReportQuotaUsage";
-	public static final String KV_PUT = "KV_PUT";
-	public static final String KV_GET = "KV_GET";
+    public static final String REPORT_QUOTA_USAGE = "ReportQuotaUsage";
+    public static final String KV_PUT = "KV_PUT";
+    public static final String KV_GET = "KV_GET";
 
-	public static SafeHistogramCache shc = SafeHistogramCache.getInstance();
+    public static SafeHistogramCache shc = SafeHistogramCache.getInstance();
 
-	public static final String UNABLE_TO_MEET_REQUESTED_TPS = "UNABLE_TO_MEET_REQUESTED_TPS";
-	public static final String EXTRA_MS = "EXTRA_MS";
-	public static final int BATCH_SIZE = 50;
+    public static final String UNABLE_TO_MEET_REQUESTED_TPS = "UNABLE_TO_MEET_REQUESTED_TPS";
+    public static final String EXTRA_MS = "EXTRA_MS";
+    public static final int BATCH_SIZE = 50;
 
-	/**
-	 * Print a formatted message.
-	 *
-	 * @param message
-	 */
-	public static void msg(String message) {
+    /**
+     * Print a formatted message.
+     *
+     * @param message
+     */
+    public static void msg(String message) {
 
-		SimpleDateFormat sdfDate = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-		Date now = new Date();
-		String strDate = sdfDate.format(now);
-		System.out.println(strDate + ":" + message);
+        SimpleDateFormat sdfDate = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        Date now = new Date();
+        String strDate = sdfDate.format(now);
+        System.out.println(strDate + ":" + message);
 
-	}
+    }
 
-	/**
-	 * Connect to VoltDB using a comma delimited hostname list.
-	 *
-	 * @param commaDelimitedHostnames
-	 * @return
-	 * @throws Exception
-	 */
-	@SuppressWarnings("deprecation")
-	protected static Connection connectVoltDB(String commaDelimitedHostnames) throws Exception {
-		Connection connection = null;
-		String connectionString = "jdbc:singlestore://localhost:3306/test?user=root&password=dr01";
+    /**
+     * Connect to VoltDB using a comma delimited hostname list.
+     *
+     * @param commaDelimitedHostnames
+     * @return
+     * @throws Exception
+     */
+    @SuppressWarnings("deprecation")
+    protected static Connection connectS2(String commaDelimitedHostnames, String appUser, String appPassword) throws Exception {
+        Connection connection = null;
+        String password = System.getenv("S2_PASSWORD");
+        if (password == null) {
+            password = appPassword;
+        }
+        String host = System.getenv("S2_HOST");
+        if (host == null) {
+            host = commaDelimitedHostnames;
+        }
+        String user = System.getenv("S2_USER");
+        if (user == null) {
+            user = appUser;
+        }
 
-		try {
-			msg("Logging into S2");
+        final String connectString = "jdbc:singlestore://" + host + ":3306/charglt?user=" + user + "&password=" + password;
 
-			connection = (Connection) DriverManager.getConnection(connectionString);
+        try {
+            msg("Logging into S2");
 
-		} catch (Exception e) {
-			e.printStackTrace();
-			throw new Exception("DB connection failed.." + e.getMessage(), e);
-		}
+            connection = (Connection) DriverManager.getConnection(connectString);
 
-		return connection;
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new Exception("DB connection failed.." + e.getMessage(), e);
+        }
 
-	}
+        return connection;
 
-	/**
-	 * Convenience method to generate a JSON payload.
-	 *
-	 * @param length
-	 * @return
-	 */
-	protected static String getExtraUserDataAsJsonString(int length, Gson gson, Random r) {
+    }
 
-		ExtraUserData eud = new ExtraUserData();
+    /**
+     * Convenience method to generate a JSON payload.
+     *
+     * @param length
+     * @return
+     */
+    protected static String getExtraUserDataAsJsonString(int length, Gson gson, Random r) {
 
-		eud.loyaltySchemeName = "HelperCard";
-		eud.loyaltySchemeNumber = getNewLoyaltyCardNumber(r);
+        ExtraUserData eud = new ExtraUserData();
 
-		StringBuffer ourText = new StringBuffer();
+        eud.loyaltySchemeName = "HelperCard";
+        eud.loyaltySchemeNumber = getNewLoyaltyCardNumber(r);
 
-		for (int i = 0; i < length / 2; i++) {
-			ourText.append(Integer.toHexString(r.nextInt(256)));
-		}
+        StringBuffer ourText = new StringBuffer();
 
-		eud.mysteriousHexPayload = ourText.toString();
+        for (int i = 0; i < length / 2; i++) {
+            ourText.append(Integer.toHexString(r.nextInt(256)));
+        }
 
-		return gson.toJson(eud);
-	}
+        eud.mysteriousHexPayload = ourText.toString();
 
-	/**
-	 *
-	 * Delete all users in a range at tpMs per second
-	 *
-	 * @param minId
-	 * @param maxId
-	 * @param tpMs
-	 * @param mainConnection
-	 * @throws InterruptedException
-	 * @throws IOException
-	 * @throws SQLException
-	 * @throws NoConnectionsException
-	 */
-	protected static void deleteAllUsers(int minId, int maxId, int tpMs, Connection mainConnection)
-			throws InterruptedException, IOException, SQLException {
+        return gson.toJson(eud);
+    }
 
-		msg("Deleting users from " + minId + " to " + maxId);
 
-		final long startMsDelete = System.currentTimeMillis();
-		long currentMs = System.currentTimeMillis();
-		PreparedStatement deleteLoop = mainConnection
-				.prepareStatement("DELETE FROM user_table WHERE userid BETWEEN ? AND ?");
+    protected static void deleteAllUsers(int minUserId, int maxUserId, int tpMs,
+                                         Connection mainConnection) throws InterruptedException {
+        try {
+            final long startMsUpsert = System.currentTimeMillis();
 
-		// To make sure we do things at a consistent rate (tpMs) we
-		// track how many transactions we've queued this ms and sleep if
-		// we've reached our limit.
-		int tpThisMs = 0;
+            long currentMs = System.currentTimeMillis();
+            int tpThisMs = 0;
+            Random r = new Random();
 
-		// So we iterate through all our users...
-		for (int i = minId; i <= maxId; i = i + (BATCH_SIZE - 1)) {
+            CallableStatement cs = mainConnection.prepareCall("call DelUser(?)\n");
 
-			tpThisMs = tpThisMs + BATCH_SIZE;
-			if (tpThisMs > tpMs) {
+            for (int i = minUserId; i <= maxUserId; i++) {
 
-				// but sleep if we're moving too fast...
-				while (currentMs == System.currentTimeMillis()) {
-					Thread.sleep(0, 50000);
-				}
+                if (tpThisMs++ > tpMs) {
 
-				currentMs = System.currentTimeMillis();
-				tpThisMs = 0;
-			}
+                    while (currentMs == System.currentTimeMillis()) {
+                        Thread.sleep(0, 50000);
+                    }
 
-			// Put a request to delete a user into the queue.
+                    currentMs = System.currentTimeMillis();
+                    tpThisMs = 0;
+                }
 
-			deleteLoop.setLong(1, i);
-			deleteLoop.setLong(2, i + (BATCH_SIZE - 1));
 
-			deleteLoop.executeUpdate();
+                cs.setLong(1, i);
+                cs.execute();
 
-			if (i % 100000 == 1) {
-				msg("Deleted " + i + " users...");
-				mainConnection.commit();
-			}
+                if (i % 100000 == 1) {
+                    msg("Upserted " + i + " users...");
+                    mainConnection.commit();
+                }
 
-		}
+            }
 
-		mainConnection.commit();
+            msg("All " + minUserId + " -> " + maxUserId + " entries in queue, waiting for it to drain...");
+            mainConnection.commit();
 
-		final long entriesPerMs = (maxId - minId + 1) / (System.currentTimeMillis() - startMsDelete);
-		msg("Deleted " + entriesPerMs + " users per ms...");
-	}
+            long entriesPerMS = (maxUserId - minUserId) / (System.currentTimeMillis() - startMsUpsert);
+            msg("Deleted " + entriesPerMS + " users per ms...");
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
-	/**
-	 * Create userCount users at tpMs per second.
-	 *
-	 * @param userCount
-	 * @param tpMs
-	 * @param ourJson
-	 * @param initialCredit
-	 * @param mainConnection
 
-	 */
-	protected static void upsertAllUsers(int userCount, int tpMs, String ourJson, int initialCredit,
-			Connection mainConnection) throws InterruptedException {
+    /**
+     * Create userCount users at tpMs per second.
+     *
+     * @param userCount
+     * @param tpMs
+     * @param ourJson
+     * @param initialCredit
+     * @param mainConnection
+     */
+    protected static void upsertAllUsers(int userCount, int tpMs, String ourJson, int initialCredit,
+                                         Connection mainConnection) throws InterruptedException {
+        try {
+            final long startMsUpsert = System.currentTimeMillis();
 
-		final long startMsUpsert = System.currentTimeMillis();
+            long currentMs = System.currentTimeMillis();
+            int tpThisMs = 0;
+            Random r = new Random();
 
-		long currentMs = System.currentTimeMillis();
-		int tpThisMs = 0;
-		Random r = new Random();
+            CallableStatement cs = null;
+            cs = mainConnection.prepareCall("call UpsertUser(?,?,?,?,?,?)\n");
 
-		for (int i = 0; i < userCount; i++) {
+            for (int i = 0; i < userCount; i++) {
 
-			if (tpThisMs++ > tpMs) {
+                if (tpThisMs++ > tpMs) {
 
-				while (currentMs == System.currentTimeMillis()) {
-					Thread.sleep(0, 50000);
-				}
+                    while (currentMs == System.currentTimeMillis()) {
+                        Thread.sleep(0, 50000);
+                    }
 
-				currentMs = System.currentTimeMillis();
-				tpThisMs = 0;
-			}
+                    currentMs = System.currentTimeMillis();
+                    tpThisMs = 0;
+                }
 
-//			ComplainOnErrorCallback upsertUserCallback = new ComplainOnErrorCallback();
+
+
+                cs.setLong(1, i);
+                cs.setLong(2, r.nextInt(initialCredit));
+                cs.setString(3, ourJson);
+                cs.setString(4, "Initial Creation");
+                cs.setTimestamp(5, new Timestamp(System.currentTimeMillis()));
+                cs.setString(6, startMsUpsert + "_" + i);
+                cs.execute();
+
+
+                //ComplainOnErrorCallback upsertUserCallback = new ComplainOnErrorCallback();
 //
 //			mainConnection.callProcedure(upsertUserCallback, "UpsertUser", i, r.nextInt(initialCredit), ourJson,
 //					"Created", new Date(startMsUpsert), "Create_" + i);
 
-			if (i % 100000 == 1) {
-				msg("Upserted " + i + " users...");
+                if (i % 100000 == 1) {
+                    msg("Upserted " + i + " users...");
+                    mainConnection.commit();
+                }
 
-			}
+            }
 
-		}
+            msg("All " + userCount + " entries in queue, waiting for it to drain...");
+            mainConnection.commit();
 
-		msg("All " + userCount + " entries in queue, waiting for it to drain...");
-		//mainConnection.drain();
+            long entriesPerMS = userCount / (System.currentTimeMillis() - startMsUpsert);
+            msg("Upserted " + entriesPerMS + " users per ms...");
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
-		long entriesPerMS = userCount / (System.currentTimeMillis() - startMsUpsert);
-		msg("Upserted " + entriesPerMS + " users per ms...");
-	}
-
-	/**
-	 * Convenience method to query a user a general stats and log the results.
-	 *
-	 * @param mainConnection
-	 * @param queryUserId
-
-	 */
-	protected static void queryUserAndStats(Connection mainConnection, long queryUserId)
-			{
+    /**
+     * Convenience method to query a user a general stats and log the results.
+     *
+     * @param mainConnection
+     * @param queryUserId
+     */
+    protected static void queryUserAndStats(Connection mainConnection, long queryUserId) {
 
 //		// Query user #queryUserId...
 //		msg("Query user #" + queryUserId + "...");
@@ -259,448 +260,435 @@ public abstract class BaseChargingDemo {
 //		for (int i = 0; i < allocResponse.getResults().length; i++) {
 //			msg(System.lineSeparator() + allocResponse.getResults()[i].toFormattedString());
 //		}
-	}
+    }
 
-	/**
-	 *
-	 * Convenience method to query all users who have a specific loyalty card id
-	 *
-	 * @param mainConnection
-	 * @param cardId
+    /**
+     *
+     * Convenience method to query all users who have a specific loyalty card id
+     *
+     * @param mainConnection
+     * @param cardId
+     */
+    protected static void queryLoyaltyCard(Connection mainConnection, long cardId) throws IOException {
 
-	 */
-	protected static void queryLoyaltyCard(Connection mainConnection, long cardId) throws IOException {
-
-		// Query user #queryUserId...
-		msg("Query card #" + cardId + "...");
+        // Query user #queryUserId...
+        msg("Query card #" + cardId + "...");
 //		ConnectionResponse userResponse = mainConnection.callProcedure("FindByLoyaltyCard", cardId);
 //
 //		for (int i = 0; i < userResponse.getResults().length; i++) {
 //			msg(System.lineSeparator() + userResponse.getResults()[i].toFormattedString());
 //		}
 
-	}
+    }
 
-	/**
-	 *
-	 * Run a key value store benchmark for userCount users at tpMs transactions per
-	 * millisecond and with deltaProportion records sending the entire record.
-	 *
-	 * @param userCount
-	 * @param tpMs
-	 * @param durationSeconds
-	 * @param globalQueryFreqSeconds
-	 * @param jsonsize
-	 * @param mainConnection
-	 * @param deltaProportion
-	 * @param extraMs
-	 * @return true if >=90% of requested throughput was achieved.
-	 * @throws InterruptedException
-	 */
-	protected static boolean runKVBenchmark(int userCount, int tpMs, int durationSeconds, int globalQueryFreqSeconds,
-			int jsonsize, Connection mainConnection, int deltaProportion, int extraMs) throws InterruptedException {
+    /**
+     *
+     * Run a key value store benchmark for userCount users at tpMs transactions per
+     * millisecond and with deltaProportion records sending the entire record.
+     *
+     * @param userCount
+     * @param tpMs
+     * @param durationSeconds
+     * @param globalQueryFreqSeconds
+     * @param jsonsize
+     * @param mainConnection
+     * @param deltaProportion
+     * @param extraMs
+     * @return true if >=90% of requested throughput was achieved.
+     * @throws InterruptedException
+     */
+    protected static boolean runKVBenchmark(int userCount, int tpMs, int durationSeconds, int globalQueryFreqSeconds,
+                                            int jsonsize, Connection mainConnection, int deltaProportion, int extraMs) throws InterruptedException {
 
-		long lastGlobalQueryMs = 0;
+        long lastGlobalQueryMs = 0;
 
-		UserKVState[] userState = new UserKVState[userCount];
+        UserKVState[] userState = new UserKVState[userCount];
 
-		Random r = new Random();
+        Random r = new Random();
 
-		Gson gson = new Gson();
+        Gson gson = new Gson();
 
-		for (int i = 0; i < userCount; i++) {
-			userState[i] = new UserKVState(i, shc);
-		}
+        for (int i = 0; i < userCount; i++) {
+            userState[i] = new UserKVState(i, shc);
+        }
 
-		final long startMsRun = System.currentTimeMillis();
-		long currentMs = System.currentTimeMillis();
-		int tpThisMs = 0;
+        final long startMsRun = System.currentTimeMillis();
+        long currentMs = System.currentTimeMillis();
+        int tpThisMs = 0;
 
-		final long endtimeMs = System.currentTimeMillis() + (durationSeconds * 1000);
+        final long endtimeMs = System.currentTimeMillis() + (durationSeconds * 1000L);
 
-		// How many transactions we've done...
-		int tranCount = 0;
-		int inFlightCount = 0;
-		int lockCount = 0;
-		int contestedLockCount = 0;
-		int fullUpdate = 0;
-		int deltaUpdate = 0;
+        // How many transactions we've done...
+        int tranCount = 0;
+        int inFlightCount = 0;
+        int lockCount = 0;
+        int contestedLockCount = 0;
+        int fullUpdate = 0;
+        int deltaUpdate = 0;
 
-		while (endtimeMs > System.currentTimeMillis()) {
+        while (endtimeMs > System.currentTimeMillis()) {
 
-			if (tpThisMs++ > tpMs) {
+            if (tpThisMs++ > tpMs) {
 
-				while (currentMs == System.currentTimeMillis()) {
-					Thread.sleep(0, 50000);
+                while (currentMs == System.currentTimeMillis()) {
+                    Thread.sleep(0, 50000);
 
-				}
+                }
 
-				sleepExtraMSIfNeeded(extraMs);
+                sleepExtraMSIfNeeded(extraMs);
 
-				currentMs = System.currentTimeMillis();
-				tpThisMs = 0;
-			}
+                currentMs = System.currentTimeMillis();
+                tpThisMs = 0;
+            }
 
-			// Find session to do a transaction for...
-			int oursession = r.nextInt(userCount);
+            // Find session to do a transaction for...
+            int oursession = r.nextInt(userCount);
 
-			// See if session already has an active transaction and avoid
-			// it if it does.
+            // See if session already has an active transaction and avoid
+            // it if it does.
 
-			if (userState[oursession].isTxInFlight()) {
+            if (userState[oursession].isTxInFlight()) {
 
-				inFlightCount++;
+                inFlightCount++;
 
-			} else if (userState[oursession].getUserStatus() == UserKVState.STATUS_LOCKED_BY_SOMEONE_ELSE) {
+            } else if (userState[oursession].getUserStatus() == UserKVState.STATUS_LOCKED_BY_SOMEONE_ELSE) {
 
-				if (userState[oursession].getOtherLockTimeMs() + ReferenceData.LOCK_TIMEOUT_MS < System
-						.currentTimeMillis()) {
+                if (userState[oursession].getOtherLockTimeMs() + ReferenceData.LOCK_TIMEOUT_MS < System
+                        .currentTimeMillis()) {
 
-					userState[oursession].startTran();
-					userState[oursession].setStatus(UserKVState.STATUS_TRYING_TO_LOCK);
-					//mainConnection.callProcedure(userState[oursession], "GetAndLockUser", oursession);
-					lockCount++;
+                    userState[oursession].startTran();
+                    userState[oursession].setStatus(UserKVState.STATUS_TRYING_TO_LOCK);
+                    //mainConnection.callProcedure(userState[oursession], "GetAndLockUser", oursession);
+                    lockCount++;
 
-				} else {
-					contestedLockCount++;
-				}
+                } else {
+                    contestedLockCount++;
+                }
 
-			} else if (userState[oursession].getUserStatus() == UserKVState.STATUS_UNLOCKED) {
+            } else if (userState[oursession].getUserStatus() == UserKVState.STATUS_UNLOCKED) {
 
-				userState[oursession].startTran();
-				userState[oursession].setStatus(UserKVState.STATUS_TRYING_TO_LOCK);
-				//mainConnection.callProcedure(userState[oursession], "GetAndLockUser", oursession);
-				lockCount++;
+                userState[oursession].startTran();
+                userState[oursession].setStatus(UserKVState.STATUS_TRYING_TO_LOCK);
+                //mainConnection.callProcedure(userState[oursession], "GetAndLockUser", oursession);
+                lockCount++;
 
-			} else if (userState[oursession].getUserStatus() == UserKVState.STATUS_LOCKED) {
+            } else if (userState[oursession].getUserStatus() == UserKVState.STATUS_LOCKED) {
 
-				userState[oursession].startTran();
-				userState[oursession].setStatus(UserKVState.STATUS_UPDATING);
+                userState[oursession].startTran();
+                userState[oursession].setStatus(UserKVState.STATUS_UPDATING);
 
-				if (deltaProportion > r.nextInt(101)) {
-					deltaUpdate++;
-					// Instead of sending entire JSON object across wire ask app to update loyalty
-					// number. For
-					// large values stored as JSON this can have a dramatic effect on network
-					// bandwidth
+                if (deltaProportion > r.nextInt(101)) {
+                    deltaUpdate++;
+                    // Instead of sending entire JSON object across wire ask app to update loyalty
+                    // number. For
+                    // large values stored as JSON this can have a dramatic effect on network
+                    // bandwidth
 //					mainConnection.callProcedure(userState[oursession], "UpdateLockedUser", oursession,
 //							userState[oursession].getLockId(), getNewLoyaltyCardNumber(r),
 //							ExtraUserData.NEW_LOYALTY_NUMBER);
-				} else {
-					fullUpdate++;
+                } else {
+                    fullUpdate++;
 //					mainConnection.callProcedure(userState[oursession], "UpdateLockedUser", oursession,
 //							userState[oursession].getLockId(), getExtraUserDataAsJsonString(jsonsize, gson, r), null);
-				}
+                }
 
-			}
+            }
 
-			tranCount++;
+            tranCount++;
 
-			if (tranCount % 100000 == 1) {
-				msg("Transaction " + tranCount);
-			}
+            if (tranCount % 100000 == 1) {
+                msg("Transaction " + tranCount);
+            }
 
-		}
+        }
 
-		// See if we need to do global queries...
-		if (lastGlobalQueryMs + (globalQueryFreqSeconds * 1000) < System.currentTimeMillis()) {
-			lastGlobalQueryMs = System.currentTimeMillis();
+        // See if we need to do global queries...
+        if (lastGlobalQueryMs + (globalQueryFreqSeconds * 1000L) < System.currentTimeMillis()) {
+            lastGlobalQueryMs = System.currentTimeMillis();
 
-			queryUserAndStats(mainConnection, GENERIC_QUERY_USER_ID);
+            queryUserAndStats(mainConnection, GENERIC_QUERY_USER_ID);
 
-		}
+        }
 
-		msg(tranCount + " transactions done...");
-		msg("All entries in queue, waiting for it to drain...");
-		//mainConnection.drain();
-		msg("Queue drained...");
+        msg(tranCount + " transactions done...");
+        msg("All entries in queue, waiting for it to drain...");
+        //mainConnection.drain();
+        msg("Queue drained...");
 
-		long transactionsPerMs = tranCount / (System.currentTimeMillis() - startMsRun);
-		msg("processed " + transactionsPerMs + " entries per ms while doing transactions...");
+        long transactionsPerMs = tranCount / (System.currentTimeMillis() - startMsRun);
+        msg("processed " + transactionsPerMs + " entries per ms while doing transactions...");
 
-		long lockFailCount = 0;
-		for (int i = 0; i < userCount; i++) {
-			lockFailCount += userState[i].getLockedBySomeoneElseCount();
-		}
+        long lockFailCount = 0;
+        for (int i = 0; i < userCount; i++) {
+            lockFailCount += userState[i].getLockedBySomeoneElseCount();
+        }
 
-		msg(inFlightCount + " events where a tx was in flight were observed");
-		msg(lockCount + " lock attempts");
-		msg(contestedLockCount + " contested lock attempts");
-		msg(lockFailCount + " lock attempt failures");
-		msg(fullUpdate + " full updates");
-		msg(deltaUpdate + " delta updates");
+        msg(inFlightCount + " events where a tx was in flight were observed");
+        msg(lockCount + " lock attempts");
+        msg(contestedLockCount + " contested lock attempts");
+        msg(lockFailCount + " lock attempt failures");
+        msg(fullUpdate + " full updates");
+        msg(deltaUpdate + " delta updates");
 
-		double tps = tranCount;
-		tps = tps / (System.currentTimeMillis() - startMsRun);
-		tps = tps * 1000;
+        double tps = tranCount;
+        tps = tps / (System.currentTimeMillis() - startMsRun);
+        tps = tps * 1000;
 
-		reportRunLatencyStats(tpMs, tps);
+        reportRunLatencyStats(tpMs, tps);
 
-		// Declare victory if we got >= 90% of requested TPS...
-		if (tps / (tpMs * 1000) > .9) {
-			return true;
+        // Declare victory if we got >= 90% of requested TPS...
+        return tps / (tpMs * 1000) > .9;
+    }
 
-		}
+    /**
+     * Used when we need to really slow down below 1 tx per ms..
+     *
+     * @param extraMs an arbitrary extra delay.
+     */
+    private static void sleepExtraMSIfNeeded(int extraMs) {
+        if (extraMs > 0) {
+            try {
+                Thread.sleep(extraMs);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
 
-		return false;
-	}
+    }
 
-	/**
-	 * Used when we need to really slow down below 1 tx per ms..
-	 * 
-	 * @param extraMs an arbitrary extra delay.
-	 */
-	private static void sleepExtraMSIfNeeded(int extraMs) {
-		if (extraMs > 0) {
-			try {
-				Thread.sleep(extraMs);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
-		}
+    /**
+     * Convenience method to remove unneeded records storing old allotments of
+     * credit.
+     *
+     * @param mainConnection
+     * @throws IOException
+     * @throws SQLException
+     */
+    protected static void clearUnfinishedTransactions(Connection mainConnection) throws IOException, SQLException {
 
-	}
+        msg("Clearing unfinished transactions from prior runs...");
 
-	/**
-	 * Convenience method to remove unneeded records storing old allotments of
-	 * credit.
-	 *
-	 * @param mainConnection
-	 * @throws IOException
-	 * @throws SQLException
-	 */
-	protected static void clearUnfinishedTransactions(Connection mainConnection) throws IOException, SQLException {
+        Statement stmt = mainConnection.createStatement();
 
-		msg("Clearing unfinished transactions from prior runs...");
+        stmt.execute("TRUNCATE TABLE user_usage_table;");
+        stmt.close();
 
-		Statement stmt = mainConnection.createStatement();
+        msg("...done");
 
-		stmt.execute("TRUNCATE TABLE user_usage_table;");
-		stmt.close();
+    }
 
-		msg("...done");
+    /**
+     *
+     * Convenience method to clear outstaning locks between runs
+     *
+     * @param mainConnection
+     * @throws IOException
+     */
+    protected static void unlockAllRecords(Connection mainConnection) throws IOException, SQLException {
 
-	}
+        msg("Clearing locked sessions from prior runs...");
 
-	/**
-	 *
-	 * Convenience method to clear outstaning locks between runs
-	 *
-	 * @param mainConnection
-	 * @throws IOException
-	 */
-	protected static void unlockAllRecords(Connection mainConnection) throws IOException, SQLException {
+        Statement stmt = mainConnection.createStatement();
 
-		msg("Clearing locked sessions from prior runs...");
+        stmt.execute(
+                "UPDATE user_table SET user_softlock_sessionid = null, user_softlock_expiry = null WHERE user_softlock_sessionid IS NOT NULL;");
+        mainConnection.commit();
+        msg("...done");
 
-		Statement stmt = mainConnection.createStatement();
+    }
 
-		stmt.execute(
-				"UPDATE user_table SET user_softlock_sessionid = null, user_softlock_expiry = null WHERE user_softlock_sessionid IS NOT NULL;");
-		mainConnection.commit();
-		msg("...done");
+    /**
+     *
+     * Run a transaction benchmark for userCount users at tpMs per ms.
+     *
+     * @param userCount              number of users
+     * @param tpMs                   transactions per milliseconds
+     * @param durationSeconds
+     * @param globalQueryFreqSeconds how often we check on global stats and a single
+     *                               user
+     * @param mainConnection
+     * @return true if within 90% of targeted TPS
+     */
+    protected static boolean runTransactionBenchmark(int userCount, int tpMs, int durationSeconds,
+                                                     int globalQueryFreqSeconds, Connection mainConnection, int extraMs) throws InterruptedException {
 
-	}
+        // Used to track changes and be unique when we are running multiple threads
+        final long pid = getPid();
 
-	/**
-	 *
-	 * Run a transaction benchmark for userCount users at tpMs per ms.
-	 *
-	 * @param userCount              number of users
-	 * @param tpMs                   transactions per milliseconds
-	 * @param durationSeconds
-	 * @param globalQueryFreqSeconds how often we check on global stats and a single
-	 *                               user
-	 * @param mainConnection
+        Random r = new Random();
 
-	 * @return true if within 90% of targeted TPS
+        UserTransactionState[] users = new UserTransactionState[userCount];
 
-	 */
-	protected static boolean runTransactionBenchmark(int userCount, int tpMs, int durationSeconds,
-			int globalQueryFreqSeconds, Connection mainConnection, int extraMs) throws InterruptedException {
+        msg("Creating Connection records for " + users.length + " users");
+        for (int i = 0; i < users.length; i++) {
+            // We don't know a users credit till we've spoken to the server, so
+            // we make an optimistic assumption...
+            users[i] = new UserTransactionState(i, Long.MAX_VALUE);
+        }
 
-		// Used to track changes and be unique when we are running multiple threads
-		final long pid = getPid();
+        final long startMsRun = System.currentTimeMillis();
+        long currentMs = System.currentTimeMillis();
+        int tpThisMs = 0;
 
-		Random r = new Random();
+        final long endtimeMs = System.currentTimeMillis() + (durationSeconds * 1000L);
 
-		UserTransactionState[] users = new UserTransactionState[userCount];
+        // How many transactions we've done...
+        long tranCount = 0;
+        long inFlightCount = 0;
+        long addCreditCount = 0;
+        long reportUsageCount = 0;
+        long lastGlobalQueryMs = System.currentTimeMillis();
 
-		msg("Creating Connection records for " + users.length + " users");
-		for (int i = 0; i < users.length; i++) {
-			// We don't know a users credit till we've spoken to the server, so
-			// we make an optimistic assumption...
-			users[i] = new UserTransactionState(i, Long.MAX_VALUE);
-		}
+        msg("starting...");
 
-		final long startMsRun = System.currentTimeMillis();
-		long currentMs = System.currentTimeMillis();
-		int tpThisMs = 0;
+        while (endtimeMs > System.currentTimeMillis()) {
 
-		final long endtimeMs = System.currentTimeMillis() + (durationSeconds * 1000);
+            if (tpThisMs++ > tpMs) {
 
-		// How many transactions we've done...
-		long tranCount = 0;
-		long inFlightCount = 0;
-		long addCreditCount = 0;
-		long reportUsageCount = 0;
-		long lastGlobalQueryMs = System.currentTimeMillis();
+                while (currentMs == System.currentTimeMillis()) {
+                    Thread.sleep(0, 50000);
 
-		msg("starting...");
+                }
 
-		while (endtimeMs > System.currentTimeMillis()) {
+                sleepExtraMSIfNeeded(extraMs);
 
-			if (tpThisMs++ > tpMs) {
+                currentMs = System.currentTimeMillis();
+                tpThisMs = 0;
+            }
 
-				while (currentMs == System.currentTimeMillis()) {
-					Thread.sleep(0, 50000);
+            int randomuser = r.nextInt(userCount);
 
-				}
+            if (users[randomuser].isTxInFlight()) {
+                inFlightCount++;
+            } else {
 
-				sleepExtraMSIfNeeded(extraMs);
+                users[randomuser].startTran();
 
-				currentMs = System.currentTimeMillis();
-				tpThisMs = 0;
-			}
+                if (users[randomuser].spendableBalance < 1000) {
 
-			int randomuser = r.nextInt(userCount);
+                    addCreditCount++;
 
-			if (users[randomuser].isTxInFlight()) {
-				inFlightCount++;
-			} else {
+                    final long extraCredit = r.nextInt(1000) + 1000;
 
-				users[randomuser].startTran();
-
-				if (users[randomuser].spendableBalance < 1000) {
-
-					addCreditCount++;
-
-					final long extraCredit = r.nextInt(1000) + 1000;
-
-					AddCreditCallback addCreditCallback = new AddCreditCallback(users[randomuser]);
+                    AddCreditCallback addCreditCallback = new AddCreditCallback(users[randomuser]);
 
 //					mainConnection.callProcedure(addCreditCallback, "AddCredit", randomuser, extraCredit,
 //							"AddCreditOnShortage_" + pid + "_" + addCreditCount + "_" + System.currentTimeMillis());
 
-				} else {
+                } else {
 
-					reportUsageCount++;
+                    reportUsageCount++;
 
-					ReportQuotaUsageCallback reportUsageCallback = new ReportQuotaUsageCallback(users[randomuser], shc);
+                    ReportQuotaUsageCallback reportUsageCallback = new ReportQuotaUsageCallback(users[randomuser], shc);
 
-					long unitsUsed = (int) (users[randomuser].currentlyReserved * 0.9);
-					long unitsWanted = r.nextInt(100);
+                    long unitsUsed = (int) (users[randomuser].currentlyReserved * 0.9);
+                    long unitsWanted = r.nextInt(100);
 
 //					mainConnection.callProcedure(reportUsageCallback, "ReportQuotaUsage", randomuser, unitsUsed,
 //							unitsWanted, users[randomuser].sessionId,
 //							"ReportQuotaUsage_" + pid + "_" + reportUsageCount + "_" + System.currentTimeMillis());
 
-				}
-			}
+                }
+            }
 
-			if (tranCount++ % 100000 == 0) {
-				msg("On transaction #" + tranCount);
-			}
+            if (tranCount++ % 100000 == 0) {
+                msg("On transaction #" + tranCount);
+            }
 
-			// See if we need to do global queries...
-			if (lastGlobalQueryMs + (globalQueryFreqSeconds * 1000) < System.currentTimeMillis()) {
-				lastGlobalQueryMs = System.currentTimeMillis();
+            // See if we need to do global queries...
+            if (lastGlobalQueryMs + (globalQueryFreqSeconds * 1000L) < System.currentTimeMillis()) {
+                lastGlobalQueryMs = System.currentTimeMillis();
 
-				queryUserAndStats(mainConnection, GENERIC_QUERY_USER_ID);
+                queryUserAndStats(mainConnection, GENERIC_QUERY_USER_ID);
 
-			}
+            }
 
-		}
+        }
 
-		msg("finished adding transactions to queue");
-		//mainConnection.drain();
-		msg("Queue drained");
+        msg("finished adding transactions to queue");
+        //mainConnection.drain();
+        msg("Queue drained");
 
-		long elapsedTimeMs = System.currentTimeMillis() - startMsRun;
-		msg("Processed " + tranCount + " transactions in " + elapsedTimeMs + " milliseconds");
+        long elapsedTimeMs = System.currentTimeMillis() - startMsRun;
+        msg("Processed " + tranCount + " transactions in " + elapsedTimeMs + " milliseconds");
 
-		double tps = tranCount;
-		tps = tps / (elapsedTimeMs / 1000);
+        double tps = tranCount;
+        tps = tps / (elapsedTimeMs / 1000);
 
-		msg("TPS = " + tps);
+        msg("TPS = " + tps);
 
-		msg("Add Credit calls = " + addCreditCount);
-		msg("Report Usage calls = " + reportUsageCount);
-		msg("Skipped because transaction was in flight = " + inFlightCount);
+        msg("Add Credit calls = " + addCreditCount);
+        msg("Report Usage calls = " + reportUsageCount);
+        msg("Skipped because transaction was in flight = " + inFlightCount);
 
-		reportRunLatencyStats(tpMs, tps);
+        reportRunLatencyStats(tpMs, tps);
 
-		// Declare victory if we got >= 90% of requested TPS...
-		if (tps / (tpMs * 1000) > .9) {
-			return true;
+        // Declare victory if we got >= 90% of requested TPS...
+        return tps / (tpMs * 1000) > .9;
+    }
 
-		}
+    /**
+     * Turn latency stats into a grepable string
+     *
+     * @param tpMs target transactions per millisecond
+     * @param tps  observed TPS
+     */
+    private static void reportRunLatencyStats(int tpMs, double tps) {
+        StringBuffer oneLineSummary = new StringBuffer("GREPABLE SUMMARY:");
 
-		return false;
-	}
+        oneLineSummary.append(tpMs);
+        oneLineSummary.append(':');
 
-	/**
-	 * Turn latency stats into a grepable string
-	 *
-	 * @param tpMs target transactions per millisecond
-	 * @param tps  observed TPS
-	 */
-	private static void reportRunLatencyStats(int tpMs, double tps) {
-		StringBuffer oneLineSummary = new StringBuffer("GREPABLE SUMMARY:");
+        oneLineSummary.append(tps);
+        oneLineSummary.append(':');
 
-		oneLineSummary.append(tpMs);
-		oneLineSummary.append(':');
+        SafeHistogramCache.getProcPercentiles(shc, oneLineSummary, REPORT_QUOTA_USAGE);
 
-		oneLineSummary.append(tps);
-		oneLineSummary.append(':');
+        SafeHistogramCache.getProcPercentiles(shc, oneLineSummary, KV_PUT);
 
-		SafeHistogramCache.getProcPercentiles(shc, oneLineSummary, REPORT_QUOTA_USAGE);
+        SafeHistogramCache.getProcPercentiles(shc, oneLineSummary, KV_GET);
 
-		SafeHistogramCache.getProcPercentiles(shc, oneLineSummary, KV_PUT);
+        msg(oneLineSummary.toString());
 
-		SafeHistogramCache.getProcPercentiles(shc, oneLineSummary, KV_GET);
+        msg(shc.toString());
+    }
 
-		msg(oneLineSummary.toString());
+    /**
+     * Get Linux process ID - used for pseudo unique ids
+     *
+     * @return Linux process ID
+     */
+    private static long getPid() {
+        return ProcessHandle.current().pid();
+    }
 
-		msg(shc.toString());
-	}
+    /**
+     * Return a loyalty card number
+     *
+     * @param r
+     * @return a random loyalty card number between 0 and 1 million
+     */
+    private static long getNewLoyaltyCardNumber(Random r) {
+        return System.currentTimeMillis() % 1000000;
+    }
 
-	/**
-	 * Get Linux process ID - used for pseudo unique ids
-	 * 
-	 * @return Linux process ID
-	 */
-	private static long getPid() {
-		return ProcessHandle.current().pid();
-	}
+    /**
+     * get EXTRA_MS env variable if set
+     *
+     * @return extraMs
+     */
+    public static int getExtraMsIfSet() {
 
-	/**
-	 * Return a loyalty card number
-	 *
-	 * @param r
-	 * @return a random loyalty card number between 0 and 1 million
-	 */
-	private static long getNewLoyaltyCardNumber(Random r) {
-		return System.currentTimeMillis() % 1000000;
-	}
+        int extraMs = 0;
 
-	/**
-	 * get EXTRA_MS env variable if set
-	 * 
-	 * @return extraMs
-	 */
-	public static int getExtraMsIfSet() {
+        String extraMsEnv = System.getenv(EXTRA_MS);
 
-		int extraMs = 0;
+        if (extraMsEnv != null && extraMsEnv.length() > 0) {
+            msg("EXTRA_MS is '" + extraMsEnv + "'");
+            extraMs = Integer.parseInt(extraMsEnv);
+        }
 
-		String extraMsEnv = System.getenv(EXTRA_MS);
-
-		if (extraMsEnv != null && extraMsEnv.length() > 0) {
-			msg("EXTRA_MS is '" + extraMsEnv + "'");
-			extraMs = Integer.parseInt(extraMsEnv);
-		}
-
-		return extraMs;
-	}
+        return extraMs;
+    }
 
 }

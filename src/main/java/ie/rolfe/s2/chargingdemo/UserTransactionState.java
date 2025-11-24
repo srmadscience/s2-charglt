@@ -71,11 +71,7 @@ public class UserTransactionState {
      */
     public boolean isTxInFlight() {
 
-        if (txStartMs > 0) {
-            return true;
-        }
-
-        return false;
+        return txStartMs > 0;
     }
 
     /**
