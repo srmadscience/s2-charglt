@@ -450,7 +450,7 @@ public abstract class BaseChargingDemo {
             msg(fullUpdate + " full updates");
             msg(deltaUpdate + " delta updates");
 
-             tps = tranCount;
+            tps = tranCount;
             tps = tps / (System.currentTimeMillis() - startMsRun);
             tps = tps * 1000;
 
@@ -565,70 +565,79 @@ public abstract class BaseChargingDemo {
 
         msg("starting...");
 
-        while (endtimeMs > System.currentTimeMillis()) {
+        CallableStatement addCredit = null;
+        CallableStatement reportUsage = null;
 
-            if (tpThisMs++ > tpMs) {
+        try {
+            addCredit = mainConnection.prepareCall("call AddCredit(?,?,?)\n");
+            reportUsage = mainConnection.prepareCall("call ReportQuotaUsage(?,?,?,?,?)\n");
 
-                while (currentMs == System.currentTimeMillis()) {
-                    Thread.sleep(0, 50000);
 
+            while (endtimeMs > System.currentTimeMillis()) {
+
+                if (tpThisMs++ > tpMs) {
+
+                    while (currentMs == System.currentTimeMillis()) {
+                        Thread.sleep(0, 50000);
+
+                    }
+
+                    sleepExtraMSIfNeeded(extraMs);
+
+                    currentMs = System.currentTimeMillis();
+                    tpThisMs = 0;
                 }
 
-                sleepExtraMSIfNeeded(extraMs);
+                int randomuser = r.nextInt(userCount);
 
-                currentMs = System.currentTimeMillis();
-                tpThisMs = 0;
-            }
-
-            int randomuser = r.nextInt(userCount);
-
-            if (users[randomuser].isTxInFlight()) {
-                inFlightCount++;
-            } else {
-
-                users[randomuser].startTran();
-
-                if (users[randomuser].spendableBalance < 1000) {
-
-                    addCreditCount++;
-
-                    final long extraCredit = r.nextInt(1000) + 1000;
-
-                    //  AddCreditCallback addCreditCallback = new AddCreditCallback(users[randomuser]);
-
-//					mainConnection.callProcedure(addCreditCallback, "AddCredit", randomuser, extraCredit,
-//							"AddCreditOnShortage_" + pid + "_" + addCreditCount + "_" + System.currentTimeMillis());
-
+                if (users[randomuser].isTxInFlight()) {
+                    inFlightCount++;
                 } else {
 
-                    reportUsageCount++;
+                    users[randomuser].startTran();
 
-                    //   ReportQuotaUsageCallback reportUsageCallback = new ReportQuotaUsageCallback(users[randomuser], shc);
+                    if (users[randomuser].spendableBalance < 1000) {
 
-                    long unitsUsed = (int) (users[randomuser].currentlyReserved * 0.9);
-                    long unitsWanted = r.nextInt(100);
+                        addCreditCount++;
 
-//					mainConnection.callProcedure(reportUsageCallback, "ReportQuotaUsage", randomuser, unitsUsed,
-//							unitsWanted, users[randomuser].sessionId,
-//							"ReportQuotaUsage_" + pid + "_" + reportUsageCount + "_" + System.currentTimeMillis());
+                        final long extraCredit = r.nextInt(1000) + 1000;
+
+                        addCredit.setLong(1, randomuser);
+                        addCredit.setLong(2, extraCredit);
+                        addCredit.setString(3, "AddCreditOnShortage_" + pid + "_" + addCreditCount + "_" + System.currentTimeMillis());
+                        addCredit.execute();
+
+                    } else {
+
+                        reportUsageCount++;
+
+                        long unitsUsed = (int) (users[randomuser].currentlyReserved * 0.9);
+                        long unitsWanted = r.nextInt(100);
+                        reportUsage.setLong(1, randomuser);
+                        reportUsage.setLong(2, unitsUsed);
+                        reportUsage.setLong(3, unitsWanted);
+                        reportUsage.setLong(4, randomuser);
+                        reportUsage.setString(5, "ReportQuotaUsage_" + pid + "_" + reportUsageCount + "_" + System.currentTimeMillis());
+                        reportUsage.execute();
+                    }
+                }
+
+                if (tranCount++ % 100000 == 0) {
+                    msg("On transaction #" + tranCount);
+                }
+
+                // See if we need to do global queries...
+                if (lastGlobalQueryMs + (globalQueryFreqSeconds * 1000L) < System.currentTimeMillis()) {
+                    lastGlobalQueryMs = System.currentTimeMillis();
+
+                    queryUserAndStats(mainConnection, GENERIC_QUERY_USER_ID);
 
                 }
-            }
-
-            if (tranCount++ % 100000 == 0) {
-                msg("On transaction #" + tranCount);
-            }
-
-            // See if we need to do global queries...
-            if (lastGlobalQueryMs + (globalQueryFreqSeconds * 1000L) < System.currentTimeMillis()) {
-                lastGlobalQueryMs = System.currentTimeMillis();
-
-                queryUserAndStats(mainConnection, GENERIC_QUERY_USER_ID);
 
             }
-
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         }
-
         msg("finished adding transactions to queue");
         //mainConnection.drain();
         msg("Queue drained");
