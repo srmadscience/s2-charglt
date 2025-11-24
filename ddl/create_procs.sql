@@ -45,6 +45,8 @@ DECLARE
 --
 BEGIN
 --
+  START TRANSACTION;
+--
   FOR x IN COLLECT(q_user) LOOP
 --
     l_found_userid := x.userid;
@@ -85,6 +87,9 @@ ECHO SELECT * FROM user_table WHERE userid = p_userid;
 ECHO SELECT user_txn_id, txn_time FROM user_recent_transactions WHERE userid = p_userid ORDER BY txn_time, user_txn_id;
 ECHO SELECT * FROM user_usage_table WHERE userid = p_userid ORDER BY sessionid;
 echo SELECT l_status_byte, l_status_string from dual;
+--
+COMMIT;
+--
 END//
 
 CREATE OR REPLACE PROCEDURE UpdateLockedUser(p_userid bigint, p_new_lock_id bigint, p_json_payload TEXT, p_delta_operation_name TEXT)
@@ -102,6 +107,8 @@ DECLARE
   l_user_softlock_sessionid bigint := null;
 --
 BEGIN
+--
+  START TRANSACTION;
 --
   FOR x IN COLLECT(q_user) LOOP
 --
@@ -143,6 +150,9 @@ ECHO SELECT * FROM user_table WHERE userid = p_userid;
 ECHO SELECT user_txn_id, txn_time FROM user_recent_transactions WHERE userid = p_userid ORDER BY txn_time, user_txn_id;
 ECHO SELECT * FROM user_usage_table WHERE userid = p_userid ORDER BY sessionid;
 echo SELECT l_status_byte, l_status_string from dual;
+--
+COMMIT;
+--
 END//
 
 
@@ -166,6 +176,8 @@ DECLARE
   l_found_txn_id bigint := null;
 --
 BEGIN
+--
+  START TRANSACTION;
 --
   FOR x IN COLLECT(q_user) LOOP
 --
@@ -218,13 +230,18 @@ BEGIN
   END IF;
 --
   echo SELECT l_status_byte, l_status_string from dual;
+--
+  COMMIT;
+--
 END//
 
 CREATE OR REPLACE PROCEDURE DelUser (p_userid bigint) AS
 BEGIN
+START TRANSACTION;
 DELETE FROM user_table WHERE userid = p_userid;
 DELETE FROM user_usage_table WHERE userid = p_userid;
 DELETE FROM user_recent_transactions WHERE userid = p_userid;
+COMMIT;
 END//
 
 CREATE OR REPLACE PROCEDURE ReportQuotaUsage(p_userid bigint, p_units_used bigint , p_units_wanted bigint , p_sessionid bigint, p_txnId TEXT)
@@ -254,6 +271,8 @@ DECLARE
   l_offered_credit bigint := 0;
 --
 BEGIN
+--
+  START TRANSACTION;
 --
   l_amount_spent := p_units_used * -1;
   l_decision := 'Spent '||l_amount_spent;
@@ -365,6 +384,9 @@ BEGIN
 ECHO SELECT * FROM user_table WHERE userid = p_userid;
 ECHO SELECT * FROM user_usage_table WHERE userid = p_userid ORDER BY sessionid;
 echo SELECT l_status_byte, l_status_string from dual;
+--
+COMMIT;
+--
 END//
 
 
@@ -385,6 +407,8 @@ DECLARE
   l_found_txn_id bigint := null;
 --
 BEGIN
+--
+  START TRANSACTION;
 --
   FOR x IN COLLECT(q_user) LOOP
 --
@@ -444,6 +468,9 @@ BEGIN
 ECHO SELECT * FROM user_table WHERE userid = p_userid;
 ECHO SELECT * FROM user_usage_table WHERE userid = p_userid ORDER BY sessionid;
 echo SELECT l_status_byte, l_status_string from dual;
+--
+COMMIT;
+--
 END//
 
 DELIMITER ;
