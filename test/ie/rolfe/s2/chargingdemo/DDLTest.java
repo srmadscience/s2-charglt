@@ -24,6 +24,7 @@ class DDLTest {
 
     private static final String TEST_JSON_REPLACE = "NEW_LOYALTY_NUMBER";
     private static final String TEST_JSON_OBJECT = "{}";
+    final long NEW_USER_ID = 43;
     final long TEST_USER_ID = 42;
     final long BAD_USER_ID = 2;
     final long TEST_SESSION_ID = 12;
@@ -581,6 +582,239 @@ class DDLTest {
 
     }
 
+
+    @Test
+    void UpsertUserExistingUser() {
+        BaseChargingDemo.msg("UpsertUserExistingUser");
+        try {
+
+            final String TEST_TXN_ID = "Test TXN UpsertUser";
+            // make sure exists...
+            long existingUserid = getLongFromUserTable("userid");
+
+            if (existingUserid != TEST_USER_ID) {
+                fail("UpsertUserExistingUser: Test user not found at start");
+            }
+
+            // make sure balance is TEST_BALANCE...
+            long existing_balance = getLongFromUserTable("user_balance");
+
+            if (existing_balance != TEST_BALANCE) {
+                fail("UpsertUserExistingUser: Test balance wrong at start");
+            }
+
+            CallableStatement cs = connection.prepareCall("call UpsertUser(?,?,?,?,?,?)\n");
+            cs.setLong(1, TEST_USER_ID);
+            cs.setLong(2, TEST_BALANCE * 2);
+            cs.setString(3,TEST_JSON_OBJECT);
+            cs.setString(4,"Test: UpsertUserExistingUser");
+            cs.setTimestamp(5, new Timestamp(System.currentTimeMillis()));
+            cs.setString(6,TEST_TXN_ID);
+            cs.execute();
+
+            int rowCount = 0;
+            long l_status_byte = Long.MIN_VALUE;
+
+
+            do {
+                try (ResultSet resultSet = cs.getResultSet()) {
+                    if (resultSet != null && hasColumn(resultSet, "l_status_byte")) {
+
+                        while (resultSet.next()) {
+                            rowCount++;
+                            l_status_byte = resultSet.getLong("l_status_byte");
+                            BaseChargingDemo.msg(this.getClass().getName() + ":Found " + l_status_byte);
+                        }
+                    }
+                } catch (SQLException e) {
+                    BaseChargingDemo.msg(e.getMessage());
+                    fail(e);
+                    throw new RuntimeException(e);
+                }
+            } while (cs.getMoreResults());
+
+            if (l_status_byte != STATUS_OK) {
+                fail("UpsertUserExistingUser: return code should be " + STATUS_OK + ". " + " got " + l_status_byte);
+            }
+
+
+            // make sure balance is TEST_BALANCE * 2...
+            existing_balance = getLongFromUserTable("user_balance");
+
+            if (existing_balance != TEST_BALANCE * 2) {
+                fail("UpsertUserExistingUser: Test balance wrong at end");
+            }
+
+            connection.commit();
+
+            //
+            // Now try same TX again, but with 3x balance
+            //
+            cs.setLong(1, TEST_USER_ID);
+            cs.setLong(2, TEST_BALANCE * 3 ); // <- NOTE
+            cs.setString(3,TEST_JSON_OBJECT);
+            cs.setString(4,"Test: UpsertUserExistingUser");
+            cs.setTimestamp(5, new Timestamp(System.currentTimeMillis()));
+            cs.setString(6,TEST_TXN_ID);
+            cs.execute();
+
+             rowCount = 0;
+             l_status_byte = Long.MIN_VALUE;
+
+
+            do {
+                try (ResultSet resultSet = cs.getResultSet()) {
+                    if (resultSet != null && hasColumn(resultSet, "l_status_byte")) {
+
+                        while (resultSet.next()) {
+                            rowCount++;
+                            l_status_byte = resultSet.getLong("l_status_byte");
+                            BaseChargingDemo.msg(this.getClass().getName() + ":Found " + l_status_byte);
+                        }
+                    }
+                } catch (SQLException e) {
+                    BaseChargingDemo.msg(e.getMessage());
+                    fail(e);
+                    throw new RuntimeException(e);
+                }
+            } while (cs.getMoreResults());
+
+            if (l_status_byte != STATUS_TXN_ALREADY_HAPPENED) {
+                fail("UpsertUserExistingUser: return code should be " + STATUS_TXN_ALREADY_HAPPENED + ". " + " got " + l_status_byte);
+            }
+
+            //
+            // Sanity check - is balance still 2 * ?
+            existing_balance = getLongFromUserTable("user_balance");
+
+            if (existing_balance != TEST_BALANCE * 2) {
+                fail("UpsertUserExistingUser: Test balance wrong at end " + existing_balance);
+            }
+
+
+
+        } catch (SQLException e) {
+            BaseChargingDemo.msg(e.getMessage());
+            fail(e);
+            throw new RuntimeException(e);
+        }
+    }
+
+
+
+    @Test
+    void UpsertUserNewUser() {
+        BaseChargingDemo.msg("UpsertUserNewUser");
+        try {
+
+            final String TEST_TXN_ID = "Test TXN UpsertUser";
+            // make sure exists...
+            long existingUserid = getLongFromUserTable("userid", NEW_USER_ID);
+
+            if (existingUserid != Long.MIN_VALUE) {
+                fail("UpsertUserNewUser: Test user found at start");
+            }
+
+            CallableStatement cs = connection.prepareCall("call UpsertUser(?,?,?,?,?,?)\n");
+            cs.setLong(1, NEW_USER_ID);
+            cs.setLong(2, TEST_BALANCE * 2);
+            cs.setString(3,TEST_JSON_OBJECT);
+            cs.setString(4,"Test: UpsertUserExistingUser");
+            cs.setTimestamp(5, new Timestamp(System.currentTimeMillis()));
+            cs.setString(6,TEST_TXN_ID);
+            cs.execute();
+
+            int rowCount = 0;
+            long l_status_byte = Long.MIN_VALUE;
+
+
+            do {
+                try (ResultSet resultSet = cs.getResultSet()) {
+                    if (resultSet != null && hasColumn(resultSet, "l_status_byte")) {
+
+                        while (resultSet.next()) {
+                            rowCount++;
+                            l_status_byte = resultSet.getLong("l_status_byte");
+                            BaseChargingDemo.msg(this.getClass().getName() + ":Found " + l_status_byte);
+                        }
+                    }
+                } catch (SQLException e) {
+                    BaseChargingDemo.msg(e.getMessage());
+                    fail(e);
+                    throw new RuntimeException(e);
+                }
+            } while (cs.getMoreResults());
+
+            if (l_status_byte != STATUS_OK) {
+                fail("UpsertUserNewUser: return code should be " + STATUS_OK + ". " + " got " + l_status_byte);
+            }
+
+
+            // make sure balance is TEST_BALANCE * 2...
+            long existing_balance = getLongFromUserTable("user_balance",NEW_USER_ID);
+
+            if (existing_balance != TEST_BALANCE * 2) {
+                fail("UpsertUserNewUser: Test balance wrong at end");
+            }
+
+            connection.commit();
+
+            //
+            // Now try same TX again, but with 3x balance
+            //
+            cs.setLong(1, NEW_USER_ID);
+            cs.setLong(2, TEST_BALANCE * 3 ); // <- NOTE
+            cs.setString(3,TEST_JSON_OBJECT);
+            cs.setString(4,"Test: UpsertUserExistingUser");
+            cs.setTimestamp(5, new Timestamp(System.currentTimeMillis()));
+            cs.setString(6,TEST_TXN_ID);
+            cs.execute();
+
+            rowCount = 0;
+            l_status_byte = Long.MIN_VALUE;
+
+
+            do {
+                try (ResultSet resultSet = cs.getResultSet()) {
+                    if (resultSet != null && hasColumn(resultSet, "l_status_byte")) {
+
+                        while (resultSet.next()) {
+                            rowCount++;
+                            l_status_byte = resultSet.getLong("l_status_byte");
+                            BaseChargingDemo.msg(this.getClass().getName() + ":Found " + l_status_byte);
+                        }
+                    }
+                } catch (SQLException e) {
+                    BaseChargingDemo.msg(e.getMessage());
+                    fail(e);
+                    throw new RuntimeException(e);
+                }
+            } while (cs.getMoreResults());
+
+            if (l_status_byte != STATUS_TXN_ALREADY_HAPPENED) {
+                fail("UpsertUserNewUser: return code should be " + STATUS_TXN_ALREADY_HAPPENED + ". " + " got " + l_status_byte);
+            }
+
+            //
+            // Sanity check - is balance still 2 * ?
+            existing_balance = getLongFromUserTable("user_balance",NEW_USER_ID);
+
+            if (existing_balance != TEST_BALANCE * 2) {
+                fail("UpsertUserNewUser: Test balance wrong at end " + existing_balance);
+            }
+
+
+
+        } catch (SQLException e) {
+            BaseChargingDemo.msg(e.getMessage());
+            fail(e);
+            throw new RuntimeException(e);
+        }
+    }
+
+
+
+
     private boolean hasColumn(ResultSet resultSet, String columnName) throws SQLException {
 
         ResultSetMetaData rsmd = (ResultSetMetaData) resultSet.getMetaData();
@@ -593,14 +827,17 @@ class DDLTest {
         return false;
     }
 
-
     private long getLongFromUserTable(String fieldName) {
+        return getLongFromUserTable(fieldName, TEST_USER_ID);
+    }
+
+    private long getLongFromUserTable(String fieldName, long userId) {
 
         long value = Long.MIN_VALUE;
 
         try {
             CallableStatement cs = connection.prepareCall("call GetUser(?)\n");
-            cs.setLong(1, TEST_USER_ID);
+            cs.setLong(1, userId);
             cs.execute();
 
             int rowCount = 0;

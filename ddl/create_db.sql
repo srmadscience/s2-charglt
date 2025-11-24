@@ -326,6 +326,85 @@ END;
 --    PARTITION ON TABLE user_table COLUMN userid
 --    FROM CLASS chargingdemoprocs.UpsertUser;
 --    
+
+CREATE OR REPLACE PROCEDURE UpsertUser(p_userid BIGINT, p_addBalance BIGINT, p_json TEXT, p_purpose TEXT, p_lastSeen TIMESTAMP,
+            p_txnId TEXT) AS
+--
+DECLARE
+  l_status_byte int := 0;
+  l_status_string text := '';
+--
+  q_user QUERY(userid BIGINT,user_softlock_expiry TIMESTAMP, user_softlock_sessionid bigint) =
+     SELECT userid, user_softlock_expiry, user_softlock_sessionid FROM user_table WHERE userid = p_userid;
+--
+  q_txn QUERY(user_txn_id BIGINT) =
+     SELECT user_txn_id FROM user_recent_transactions WHERE userid = p_userid AND user_txn_id = p_txnId;
+--
+  l_found_userid bigint := null;
+  l_user_softlock_expiry timestamp := null;
+  l_user_softlock_sessionid bigint := null;
+--
+  l_found_txn_id bigint := null;
+--
+BEGIN
+--
+  FOR x IN COLLECT(q_user) LOOP
+--
+    l_found_userid := x.userid;
+    l_user_softlock_expiry := x.user_softlock_expiry;
+    l_user_softlock_sessionid := x.user_softlock_sessionid;
+--
+  END LOOP;
+--
+  FOR y in COLLECT(q_txn) LOOP
+--
+    l_found_txn_id := y.user_txn_id;
+--
+  END LOOP;
+--
+  IF l_found_txn_id IS NOT NULL AND l_found_txn_id = p_txnId THEN
+--
+-- Txn has already happened
+--
+    l_status_byte = 46;
+    l_status_string = 'Txn ' || p_txnId || ' already happened';
+--
+  ELSE
+--
+    IF l_found_userid = p_userid THEN
+--
+--  Update
+--
+      UPDATE user_table 
+      SET user_json_object = p_json, user_last_seen = p_lastSeen
+        , user_balance = p_addBalance, user_softlock_expiry = null, user_softlock_sessionid = null
+      WHERE userid = p_userid;
+--
+      l_status_string = 'User ' || p_userid || ' updated';
+--
+    ELSE
+--
+-- Insert
+--
+      INSERT INTO user_table (userid, user_json_object,user_last_seen,user_balance) VALUES (p_userid,p_json,p_lastSeen,p_addBalance);
+--
+      l_status_string = 'User ' || p_userid || ' inserted';
+--
+    END IF;
+--
+    l_status_byte = 42;
+--
+    INSERT INTO user_recent_transactions (userid, user_txn_id, txn_time, approved_amount,spent_amount,purpose) VALUES (p_userid,p_txnId,p_lastSeen,0,p_addBalance,'Create User');
+--
+  END IF;
+--
+  echo SELECT l_status_byte, l_status_string from dual;
+END;
+
+
+
+
+
 -- CREATE PROCEDURE 
 --    PARTITION ON TABLE user_table COLUMN userid
 --    FROM CLASS chargingdemoprocs.DelUser;
