@@ -17,9 +17,6 @@ package ie.rolfe.s2.chargingdemo;
 import com.google.gson.Gson;
 import com.singlestore.jdbc.Connection;
 import com.singlestore.jdbc.Statement;
-import ie.rolfe.s2.chargingdemo.callbacks.AddCreditCallback;
-import ie.rolfe.s2.chargingdemo.callbacks.ReportQuotaUsageCallback;
-import ie.rolfe.s2.chargingdemo.callbacks.UserKVState;
 import org.voltdb.voltutil.stats.SafeHistogramCache;
 
 import java.io.IOException;
@@ -27,9 +24,6 @@ import java.sql.*;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Random;
-
-//import chargingdemoprocs.ExtraUserData;
-//import chargingdemoprocs.ReferenceData;
 
 /**
  * This is an abstract class that contains the actual logic of the demo code.
@@ -570,7 +564,7 @@ public abstract class BaseChargingDemo {
 
                     final long extraCredit = r.nextInt(1000) + 1000;
 
-                    AddCreditCallback addCreditCallback = new AddCreditCallback(users[randomuser]);
+                  //  AddCreditCallback addCreditCallback = new AddCreditCallback(users[randomuser]);
 
 //					mainConnection.callProcedure(addCreditCallback, "AddCredit", randomuser, extraCredit,
 //							"AddCreditOnShortage_" + pid + "_" + addCreditCount + "_" + System.currentTimeMillis());
@@ -579,7 +573,7 @@ public abstract class BaseChargingDemo {
 
                     reportUsageCount++;
 
-                    ReportQuotaUsageCallback reportUsageCallback = new ReportQuotaUsageCallback(users[randomuser], shc);
+                 //   ReportQuotaUsageCallback reportUsageCallback = new ReportQuotaUsageCallback(users[randomuser], shc);
 
                     long unitsUsed = (int) (users[randomuser].currentlyReserved * 0.9);
                     long unitsWanted = r.nextInt(100);
