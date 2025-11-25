@@ -21,13 +21,12 @@ import org.voltdb.voltutil.stats.SafeHistogramCache;
 
 import javax.rmi.ssl.SslRMIClientSocketFactory;
 import java.io.IOException;
-import java.sql.CallableStatement;
-import java.sql.DriverManager;
-import java.sql.SQLException;
-import java.sql.Timestamp;
+import java.sql.*;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Random;
+
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * This is an abstract class that contains the actual logic of the demo code.
@@ -240,14 +239,44 @@ public abstract class BaseChargingDemo {
      */
     protected static void queryUserAndStats(Connection mainConnection, long queryUserId) {
 
-        //TODO
-//		// Query user #queryUserId...
-//		msg("Query user #" + queryUserId + "...");
-//		ConnectionResponse userResponse = mainConnection.callProcedure("GetUser", queryUserId);
-//
-//		for (int i = 0; i < userResponse.getResults().length; i++) {
-//			msg(System.lineSeparator() + userResponse.getResults()[i].toFormattedString());
-//		}
+
+		// Query user #queryUserId...
+        try {
+            CallableStatement cs = mainConnection.prepareCall("call GetUser(?)\n");
+            cs.setLong(1, queryUserId);
+            cs.execute();
+
+            int rowCount = 0;
+
+            do {
+                try (ResultSet resultSet = cs.getResultSet()) {
+                    if (resultSet != null) {
+                        while (resultSet.next()) {
+
+                            rowCount++;
+                            StringBuffer b = new StringBuffer();
+                            for (int i=1; i < resultSet.getMetaData().getColumnCount(); i++) {
+                                b.append('\t');
+                                b.append(resultSet.getString(i));
+                            }
+
+                            msg(b.toString());
+                        }
+                    }
+                } catch (SQLException e) {
+                    BaseChargingDemo.msg(e.getMessage());
+                    fail(e);
+                    throw new RuntimeException(e);
+                }
+            } while (cs.getMoreResults());
+
+
+        } catch (SQLException e) {
+            BaseChargingDemo.msg(e.getMessage());
+            fail(e);
+            throw new RuntimeException(e);
+        }
+
 //
 //		msg("Show amount of credit currently reserved for products...");
 //		ConnectionResponse allocResponse = mainConnection.callProcedure("ShowCurrentAllocations__promBL");
