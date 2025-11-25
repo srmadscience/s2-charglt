@@ -10,6 +10,7 @@ drop PROCEDURE UpsertUser;
 drop PROCEDURE DelUser;
 drop PROCEDURE ReportQuotaUsage;
 drop PROCEDURE AddCredit;
+drop PROCEDURE SendToKafka;
 
 drop table user_table;
 drop table user_usage_table;

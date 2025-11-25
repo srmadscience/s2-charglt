@@ -227,6 +227,8 @@ BEGIN
 --
     INSERT INTO user_recent_transactions (userid, user_txn_id, txn_time, approved_amount,spent_amount,purpose) VALUES (p_userid,p_txnId,p_lastSeen,0,p_addBalance,'Create User');
 --
+    CALL SendToKafka(p_userid,p_txnId);
+--
   END IF;
 --
   echo SELECT l_status_byte, l_status_string from dual;
@@ -347,6 +349,8 @@ BEGIN
         VALUES 
           (p_userid,p_txnId,NOW(),l_offered_credit,l_amount_spent,'Spend');  
 --
+       CALL SendToKafka(p_userid,p_txnId);
+--
       END IF;
 --
       UPDATE user_table 
@@ -445,6 +449,9 @@ BEGIN
       VALUES 
         (p_userid,p_txnId,NOW(),0,p_extra_credit,'Add Credit');       
 --
+      CALL SendToKafka(p_userid,p_txnId);
+--
+--
 --    Delete old TX records
 --
       DELETE FROM user_recent_transactions 
@@ -472,6 +479,17 @@ echo SELECT l_status_byte, l_status_string from dual;
 COMMIT;
 --
 END//
+
+CREATE OR REPLACE PROCEDURE SendToKafka(p_userid bigint, p_txnId TEXT) AS
+--
+-- Do nothing unless re-created by send_to_kafka.sql
+--
+BEGIN
+--
+  NULL;
+--
+END//
+
 
 DELIMITER ;
 
