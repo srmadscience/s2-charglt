@@ -19,6 +19,7 @@ import com.singlestore.jdbc.Connection;
 import com.singlestore.jdbc.Statement;
 import org.voltdb.voltutil.stats.SafeHistogramCache;
 
+import javax.rmi.ssl.SslRMIClientSocketFactory;
 import java.io.IOException;
 import java.sql.CallableStatement;
 import java.sql.DriverManager;
@@ -39,6 +40,7 @@ public abstract class BaseChargingDemo {
     public static final String REPORT_QUOTA_USAGE = "ReportQuotaUsage";
     public static final String KV_PUT = "KV_PUT";
     public static final String KV_GET = "KV_GET";
+    private static final String ADD_CREDIT = "ADD_CREDIT";
 
     public static SafeHistogramCache shc = SafeHistogramCache.getInstance();
 
@@ -212,10 +214,6 @@ public abstract class BaseChargingDemo {
                 cs.execute();
 
 
-                //ComplainOnErrorCallback upsertUserCallback = new ComplainOnErrorCallback();
-//
-//			mainConnection.callProcedure(upsertUserCallback, "UpsertUser", i, r.nextInt(initialCredit), ourJson,
-//					"Created", new Date(startMsUpsert), "Create_" + i);
 
                 if (i % 100000 == 1) {
                     msg("Upserted " + i + " users...");
@@ -344,6 +342,9 @@ public abstract class BaseChargingDemo {
                     tpThisMs = 0;
                 }
 
+
+                final long startMs = System.currentTimeMillis();
+
                 // Find session to do a transaction for...
                 int oursession = r.nextInt(userCount);
 
@@ -365,7 +366,7 @@ public abstract class BaseChargingDemo {
                         getAndLock.setLong(1, oursession);
                         getAndLock.setLong(2, oursession);
                         getAndLock.execute();
-
+                        shc.reportLatency(BaseChargingDemo.KV_GET, startMs, "KV Get time", 2000);
 
                         lockCount++;
 
@@ -380,6 +381,8 @@ public abstract class BaseChargingDemo {
                     getAndLock.setLong(1, oursession);
                     getAndLock.setLong(2, oursession);
                     getAndLock.execute();
+                    userState[oursession].setStatus(UserKVState.STATUS_LOCKED);
+                    shc.reportLatency(BaseChargingDemo.KV_GET, startMs, "KV Get time", 2000);
                     lockCount++;
 
                 } else if (userState[oursession].getUserStatus() == UserKVState.STATUS_LOCKED) {
@@ -388,7 +391,7 @@ public abstract class BaseChargingDemo {
                     userState[oursession].setStatus(UserKVState.STATUS_UPDATING);
 
                     if (deltaProportion > r.nextInt(101)) {
-                        deltaUpdate++;
+
                         // Instead of sending entire JSON object across wire ask app to update loyalty
                         // number. For
                         // large values stored as JSON this can have a dramatic effect on network
@@ -398,6 +401,8 @@ public abstract class BaseChargingDemo {
                         updateLockedUser.setString(3, getExtraUserDataAsJsonString(jsonsize, gson, r));
                         updateLockedUser.setString(4, "");
                         updateLockedUser.execute();
+                        shc.reportLatency(BaseChargingDemo.KV_PUT, startMs, "KV Put Time", 2000);
+                        deltaUpdate++;
                     } else {
 
                         // Instead of sending entire JSON object across wire ask app to update loyalty
@@ -409,17 +414,20 @@ public abstract class BaseChargingDemo {
                         updateLockedUser.setString(3, getExtraUserDataAsJsonString(jsonsize, gson, r));
                         updateLockedUser.setString(4, "");
                         updateLockedUser.execute();
+                        shc.reportLatency(BaseChargingDemo.KV_PUT, startMs, "KV Put Time", 2000);
                         fullUpdate++;
                     }
+
+                    userState[oursession].setStatus(UserKVState.STATUS_UNLOCKED);
 
                 }
 
                 tranCount++;
+                userState[oursession].endTran(); //TODO - Fix when we make async
 
                 if (tranCount % 100000 == 1) {
                     msg("Transaction " + tranCount);
                 }
-
             }
 
             // See if we need to do global queries...
@@ -590,6 +598,8 @@ public abstract class BaseChargingDemo {
 
                 int randomuser = r.nextInt(userCount);
 
+                final long startMs  = System.currentTimeMillis();
+
                 if (users[randomuser].isTxInFlight()) {
                     inFlightCount++;
                 } else {
@@ -606,6 +616,7 @@ public abstract class BaseChargingDemo {
                         addCredit.setLong(2, extraCredit);
                         addCredit.setString(3, "AddCreditOnShortage_" + pid + "_" + addCreditCount + "_" + System.currentTimeMillis());
                         addCredit.execute();
+                        shc.reportLatency(BaseChargingDemo.ADD_CREDIT, startMs, "ADD_CREDIT", 2000);
 
                     } else {
 
@@ -619,11 +630,15 @@ public abstract class BaseChargingDemo {
                         reportUsage.setLong(4, randomuser);
                         reportUsage.setString(5, "ReportQuotaUsage_" + pid + "_" + reportUsageCount + "_" + System.currentTimeMillis());
                         reportUsage.execute();
+                        shc.reportLatency(BaseChargingDemo.REPORT_QUOTA_USAGE, startMs, "REPORT_QUOTA_USAGE", 2000);
                     }
                 }
 
-                if (tranCount++ % 100000 == 0) {
-                    msg("On transaction #" + tranCount);
+                tranCount++;
+                users[randomuser].endTran(); //TODO - Fix when we make async
+
+                if (tranCount % 100000 == 1) {
+                    msg("Transaction " + tranCount);
                 }
 
                 // See if we need to do global queries...
