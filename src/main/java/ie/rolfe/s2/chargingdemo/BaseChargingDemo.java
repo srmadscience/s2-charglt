@@ -246,22 +246,26 @@ public abstract class BaseChargingDemo {
             cs.setLong(1, queryUserId);
             cs.execute();
 
-            int rowCount = 0;
+            int resultSetCount = 0;
 
             do {
                 try (ResultSet resultSet = cs.getResultSet()) {
+                    resultSetCount++;
+                    StringBuffer b = new StringBuffer("\nQuery :");
+                    b.append(resultSetCount);
+
                     if (resultSet != null) {
+
                         while (resultSet.next()) {
 
-                            rowCount++;
-                            StringBuffer b = new StringBuffer();
+
                             for (int i=1; i < resultSet.getMetaData().getColumnCount(); i++) {
                                 b.append('\t');
                                 b.append(resultSet.getString(i));
                             }
 
-                            msg(b.toString());
-                        }
+
+                        } msg(b.toString());
                     }
                 } catch (SQLException e) {
                     BaseChargingDemo.msg(e.getMessage());

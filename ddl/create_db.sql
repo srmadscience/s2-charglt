@@ -3,11 +3,11 @@ USE charglt;
 
 CREATE rowstore table user_table
 (userid bigint not null primary key
-,user_json_object varchar(8000)
 ,user_last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ,user_softlock_sessionid bigint 
 ,user_softlock_expiry TIMESTAMP
 ,user_balance bigint not null
+,user_json_object varchar(8000)
 ,shard key (userid));
 
 create index ut_del on user_table(user_last_seen);
