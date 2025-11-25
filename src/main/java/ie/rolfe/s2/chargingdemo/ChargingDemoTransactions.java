@@ -58,7 +58,7 @@ public class ChargingDemoTransactions extends BaseChargingDemo {
         int extraMs = getExtraMsIfSet();
 
         try {
-            // A VoltDB Client object maintains multiple connections to all the
+            // A  Client object maintains multiple connections to all the
             // servers in the cluster.
             Connection mainConnection = connectS2(hostlist, username,password);
 

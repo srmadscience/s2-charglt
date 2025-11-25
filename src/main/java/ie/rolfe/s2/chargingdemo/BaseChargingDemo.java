@@ -63,7 +63,7 @@ public abstract class BaseChargingDemo {
     }
 
     /**
-     * Connect to VoltDB using a comma delimited hostname list.
+     * Connect to SingleStore using a comma delimited hostname list.
      *
      * @param commaDelimitedHostnames
      * @return
@@ -240,6 +240,7 @@ public abstract class BaseChargingDemo {
      */
     protected static void queryUserAndStats(Connection mainConnection, long queryUserId) {
 
+        //TODO
 //		// Query user #queryUserId...
 //		msg("Query user #" + queryUserId + "...");
 //		ConnectionResponse userResponse = mainConnection.callProcedure("GetUser", queryUserId);
@@ -264,7 +265,7 @@ public abstract class BaseChargingDemo {
      * @param cardId
      */
     protected static void queryLoyaltyCard(Connection mainConnection, long cardId) throws IOException {
-
+//TODO
         // Query user #queryUserId...
         msg("Query card #" + cardId + "...");
 //		ConnectionResponse userResponse = mainConnection.callProcedure("FindByLoyaltyCard", cardId);
@@ -505,7 +506,9 @@ public abstract class BaseChargingDemo {
         stmt.execute("TRUNCATE TABLE user_usage_table;");
         stmt.close();
 
-        msg("...done");
+        unlockAllRecords(mainConnection);
+
+        msg("clearUnfinishedTransactions...done");
 
     }
 
@@ -525,7 +528,7 @@ public abstract class BaseChargingDemo {
         stmt.execute(
                 "UPDATE user_table SET user_softlock_sessionid = null, user_softlock_expiry = null WHERE user_softlock_sessionid IS NOT NULL;");
         mainConnection.commit();
-        msg("...done");
+        msg("unlockAllRecords...done");
 
     }
 
@@ -579,7 +582,6 @@ public abstract class BaseChargingDemo {
         try {
             addCredit = mainConnection.prepareCall("call AddCredit(?,?,?)\n");
             reportUsage = mainConnection.prepareCall("call ReportQuotaUsage(?,?,?,?,?)\n");
-
 
             while (endtimeMs > System.currentTimeMillis()) {
 
