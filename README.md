@@ -1,13 +1,36 @@
 # s2-charglt
 SingleStore implementation of [Charglt](https://github.com/srmadscience/voltdb-charglt), but on SingleStore
 
-It Has the  basic functionality of charglt, but is missing stuff  - see TODO
+It has the same basic functionality of charglt, but may be missing stuff  - see TODO
 
+## Installation
+
+1. create a DB called 'charglt'
+2. Run [create_db.sql](https://github.com/srmadscience/s2-charglt/blob/main/ddl/create_db.sql) 
+3. Run [create_procs.sql](https://github.com/srmadscience/s2-charglt/blob/main/ddl/create_procs.sql)
+4. Create 'X' users by running CreateChargingDemoData with:
+```
+10.13.1.101 100000 10  1000 root nevadaeagle
+```
+   ... which is hostname, usercount, transactions-per-ms, user, password
+
+5. Then run ChargingDemoTransactions with:
+
+```
+10.13.1.101 100000 10 120 30  root nevadaeagle
+```
+
+6. ...or the Key Value store demo (ChargingDemoKVStore) with:
+```
+10.13.1.101 100 1 60 15 100 50 root nevadaeagle
+```
 ## TODO
 * user_recent_transactions - needs to be selected into kafka. Have added a script
   ( send_to_kafka.sql) that should do this but it isn't working as of today.
-
-## Status
+* I have yet to implement [ShowCurrentAllocations__promBL](https://github.com/srmadscience/voltdb-charglt/blob/master/ddl/create_db.sql#L144), which is used for running totals.
+* The original version allows you to send a delta of a JSON object instead of the whole thing. I haven't implemented this.
+* This runs in a single thread doing sync calls. In the VoltDB universe this isn't an issue, as the driver is async. To get proper performance we'd need to create multiple connections and execution threads.
+## Status 
 
 While this is fine to play with, it's not a fair representation of SingleStore at the moment.
 

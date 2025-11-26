@@ -12,7 +12,7 @@ BEGIN
   SELECT userid, user_txn_id, txn_time, sessionid, approved_amount, spent_amount, purpose
   FROM user_recent_transactions
   WHERE userid = p_userid AND user_txn_id = p_txnId
-  INTO KAFKA '10.13.1.101:9092/charglt'
+  INTO KAFKA '10.13.1.21:9092/charglt'
   FIELDS TERMINATED BY '\t' ENCLOSED BY '' ESCAPED BY '\\'
   LINES TERMINATED BY '\n' STARTING BY '';
 --
