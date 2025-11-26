@@ -3,6 +3,8 @@ SingleStore implementation of [Charglt](https://github.com/srmadscience/voltdb-c
 
 It has the same basic functionality of charglt, but may be missing stuff  - see TODO
 
+Far more documentation is available at the link above.
+
 ## Installation
 
 1. create a DB called 'charglt'
