@@ -31,7 +31,7 @@ Far more documentation is available at the link above.
   ( send_to_kafka.sql) that should do this but it isn't working as of today.
 * I have yet to implement [ShowCurrentAllocations__promBL](https://github.com/srmadscience/voltdb-charglt/blob/master/ddl/create_db.sql#L144), which is used for running totals.
 * The original version allows you to send a delta of a JSON object instead of the whole thing. I haven't implemented this.
-* This runs in a single thread doing sync calls. In the VoltDB universe this isn't an issue, as the driver is async. To get proper performance we'd need to create multiple connections and execution threads.
+* This runs in a single thread doing sync calls. In the VoltDB universe this isn't an issue, as the driver is async. To get representative performance we'd need to create multiple connections and execution threads.
 ## Status 
 
 While this is fine to play with, it's not a fair representation of SingleStore at the moment.
