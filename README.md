@@ -27,8 +27,7 @@ Far more documentation is available at the link above.
 10.13.1.101 100 1 60 15 100 50 root nevadaeagle
 ```
 ## TODO
-* user_recent_transactions - needs to be selected into kafka. Have added a script
-  ( send_to_kafka.sql) that should do this but it isn't working as of today.
+
 * I have yet to implement [ShowCurrentAllocations__promBL](https://github.com/srmadscience/voltdb-charglt/blob/master/ddl/create_db.sql#L144), which is used for running totals.
 * The original version allows you to send a delta of a JSON object instead of the whole thing. I haven't implemented this.
 * This runs in a single thread doing sync calls. In the VoltDB universe this isn't an issue, as the driver is async. To get representative performance we'd need to create multiple connections and execution threads.

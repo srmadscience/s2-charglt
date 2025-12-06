@@ -57,7 +57,7 @@ class DDLTest {
         }
         String host = System.getenv("S2_HOST");
         if (host == null) {
-            host = "10.13.1.101";
+            host = "10.13.1.103";
         }
         String user = System.getenv("S2_USER");
         if (user == null) {

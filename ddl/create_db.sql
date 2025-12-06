@@ -1,4 +1,7 @@
  
+create database charglt;
+
+
 USE charglt;
 
 CREATE rowstore table user_table
