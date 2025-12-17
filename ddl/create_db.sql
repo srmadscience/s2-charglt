@@ -10,7 +10,8 @@ CREATE rowstore table user_table
 ,user_softlock_sessionid bigint 
 ,user_softlock_expiry TIMESTAMP
 ,user_balance bigint not null
-,user_json_object varchar(8000)
+,user_json_object JSON
+,user_json_cardid AS user_json_object::$loyaltySchemeNumber PERSISTED LONGTEXT
 ,shard key (userid));
 
 create index ut_del on user_table(user_last_seen);

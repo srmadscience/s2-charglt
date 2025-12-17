@@ -48,7 +48,7 @@ public class CreateChargingDemoData extends BaseChargingDemo {
 
         // How long our arbitrary JSON payload will be.
         int loblength = 120;
-        final String ourJson = getExtraUserDataAsJsonString(loblength, gson, r);
+        final String ourJson = getExtraUserDataAsJsonString(loblength, gson, r, userCount);
 
         // Default credit users are 'born' with
         int initialCredit = Integer.parseInt(args[3]);
@@ -58,7 +58,7 @@ public class CreateChargingDemoData extends BaseChargingDemo {
         try {
             Connection mainClient = connectS2(hostlist,username, password);
 
-            upsertAllUsers(userCount, tpMs, ourJson, initialCredit, mainClient);
+            upsertAllUsers(userCount, tpMs, loblength, gson, initialCredit, mainClient);
 
             msg("Closing connection...");
             mainClient.close();

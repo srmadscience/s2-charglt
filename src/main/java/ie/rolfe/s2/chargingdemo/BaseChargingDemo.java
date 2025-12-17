@@ -19,7 +19,6 @@ import com.singlestore.jdbc.Connection;
 import com.singlestore.jdbc.Statement;
 import org.voltdb.voltutil.stats.SafeHistogramCache;
 
-import javax.rmi.ssl.SslRMIClientSocketFactory;
 import java.io.IOException;
 import java.sql.*;
 import java.text.SimpleDateFormat;
@@ -39,13 +38,11 @@ public abstract class BaseChargingDemo {
     public static final String REPORT_QUOTA_USAGE = "ReportQuotaUsage";
     public static final String KV_PUT = "KV_PUT";
     public static final String KV_GET = "KV_GET";
-    private static final String ADD_CREDIT = "ADD_CREDIT";
-
-    public static SafeHistogramCache shc = SafeHistogramCache.getInstance();
-
     public static final String UNABLE_TO_MEET_REQUESTED_TPS = "UNABLE_TO_MEET_REQUESTED_TPS";
     public static final String EXTRA_MS = "EXTRA_MS";
     public static final int BATCH_SIZE = 50;
+    private static final String ADD_CREDIT = "ADD_CREDIT";
+    public static SafeHistogramCache shc = SafeHistogramCache.getInstance();
 
     /**
      * Print a formatted message.
@@ -104,14 +101,15 @@ public abstract class BaseChargingDemo {
      * Convenience method to generate a JSON payload.
      *
      * @param length
+     * @param userCount - Each loyalty card will be used by 10 people for some reason...
      * @return
      */
-    protected static String getExtraUserDataAsJsonString(int length, Gson gson, Random r) {
+    protected static String getExtraUserDataAsJsonString(int length, Gson gson, Random r, int userCount) {
 
         ExtraUserData eud = new ExtraUserData();
 
         eud.loyaltySchemeName = "HelperCard";
-        eud.loyaltySchemeNumber = getNewLoyaltyCardNumber(r);
+        eud.loyaltySchemeNumber = getNewLoyaltyCardNumber(r, userCount / 10);
 
         StringBuffer ourText = new StringBuffer();
 
@@ -153,7 +151,7 @@ public abstract class BaseChargingDemo {
                 cs.execute();
 
                 if (i % 100000 == 1) {
-                    msg("Upserted " + i + " users...");
+                    msg("Deleted " + i + " users...");
                     mainConnection.commit();
                 }
 
@@ -179,7 +177,7 @@ public abstract class BaseChargingDemo {
      * @param initialCredit
      * @param mainConnection
      */
-    protected static void upsertAllUsers(int userCount, int tpMs, String ourJson, int initialCredit,
+    protected static void upsertAllUsers(int userCount, int tpMs, int loblength, Gson gson, int initialCredit,
                                          Connection mainConnection) throws InterruptedException {
         try {
             final long startMsUpsert = System.currentTimeMillis();
@@ -192,6 +190,8 @@ public abstract class BaseChargingDemo {
             cs = mainConnection.prepareCall("call UpsertUser(?,?,?,?,?,?)\n");
 
             for (int i = 0; i < userCount; i++) {
+
+                String ourJson = getExtraUserDataAsJsonString(loblength, gson, r, userCount);
 
                 if (tpThisMs++ > tpMs) {
 
@@ -211,7 +211,6 @@ public abstract class BaseChargingDemo {
                 cs.setTimestamp(5, new Timestamp(System.currentTimeMillis()));
                 cs.setString(6, startMsUpsert + "_" + i);
                 cs.execute();
-
 
 
                 if (i % 100000 == 1) {
@@ -240,7 +239,7 @@ public abstract class BaseChargingDemo {
     protected static void queryUserAndStats(Connection mainConnection, long queryUserId) {
 
 
-		// Query user #queryUserId...
+        // Query user #queryUserId...
         try {
             CallableStatement cs = mainConnection.prepareCall("call GetUser(?)\n");
             cs.setLong(1, queryUserId);
@@ -259,13 +258,14 @@ public abstract class BaseChargingDemo {
                         while (resultSet.next()) {
 
 
-                            for (int i=1; i < resultSet.getMetaData().getColumnCount(); i++) {
+                            for (int i = 1; i < resultSet.getMetaData().getColumnCount(); i++) {
                                 b.append('\t');
                                 b.append(resultSet.getString(i));
                             }
 
 
-                        } msg(b.toString());
+                        }
+                        msg(b.toString());
                     }
                 } catch (SQLException e) {
                     BaseChargingDemo.msg(e.getMessage());
@@ -298,14 +298,20 @@ public abstract class BaseChargingDemo {
      * @param cardId
      */
     protected static void queryLoyaltyCard(Connection mainConnection, long cardId) throws IOException {
-//TODO
         // Query user #queryUserId...
-        msg("Query card #" + cardId + "...");
-//		ConnectionResponse userResponse = mainConnection.callProcedure("FindByLoyaltyCard", cardId);
-//
-//		for (int i = 0; i < userResponse.getResults().length; i++) {
-//			msg(System.lineSeparator() + userResponse.getResults()[i].toFormattedString());
-//		}
+        msg("Query loyalty card #" + cardId + "...");
+        try {
+            PreparedStatement ps = mainConnection.prepareStatement("select * from user_table where user_json_cardid = ? order by userid;");
+            ps.setLong(1, cardId);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                msg(System.lineSeparator() + rs.getLong("userid") + "\t" + rs.getString("user_json_object"));
+            }
+
+        } catch (SQLException e) {
+            msg("queryLoyaltyCard:" + e.getMessage());
+        }
+
 
     }
 
@@ -432,7 +438,7 @@ public abstract class BaseChargingDemo {
                         // bandwidth
                         updateLockedUser.setLong(1, oursession);
                         updateLockedUser.setLong(2, oursession);
-                        updateLockedUser.setString(3, getExtraUserDataAsJsonString(jsonsize, gson, r));
+                        updateLockedUser.setString(3, getExtraUserDataAsJsonString(jsonsize, gson, r, userCount));
                         updateLockedUser.setString(4, "");
                         updateLockedUser.execute();
                         shc.reportLatency(BaseChargingDemo.KV_PUT, startMs, "KV Put Time", 2000);
@@ -445,7 +451,7 @@ public abstract class BaseChargingDemo {
                         // bandwidth
                         updateLockedUser.setLong(1, oursession);
                         updateLockedUser.setLong(2, oursession);
-                        updateLockedUser.setString(3, getExtraUserDataAsJsonString(jsonsize, gson, r));
+                        updateLockedUser.setString(3, getExtraUserDataAsJsonString(jsonsize, gson, r, userCount));
                         updateLockedUser.setString(4, "");
                         updateLockedUser.execute();
                         shc.reportLatency(BaseChargingDemo.KV_PUT, startMs, "KV Put Time", 2000);
@@ -633,7 +639,7 @@ public abstract class BaseChargingDemo {
 
                 int randomuser = r.nextInt(userCount);
 
-                final long startMs  = System.currentTimeMillis();
+                final long startMs = System.currentTimeMillis();
 
                 if (users[randomuser].isTxInFlight()) {
                     inFlightCount++;
@@ -681,11 +687,12 @@ public abstract class BaseChargingDemo {
                     lastGlobalQueryMs = System.currentTimeMillis();
 
                     queryUserAndStats(mainConnection, GENERIC_QUERY_USER_ID);
+                    queryLoyaltyCard(mainConnection, GENERIC_QUERY_USER_ID);
 
                 }
 
             }
-        } catch (SQLException e) {
+        } catch (SQLException | IOException e) {
             throw new RuntimeException(e);
         }
         msg("finished adding transactions to queue");
@@ -749,10 +756,11 @@ public abstract class BaseChargingDemo {
      * Return a loyalty card number
      *
      * @param r
-     * @return a random loyalty card number between 0 and 1 million
+     * @param maxId
+     * @return a random loyalty card number between 0 and maxId
      */
-    private static long getNewLoyaltyCardNumber(Random r) {
-        return System.currentTimeMillis() % 1000000;
+    private static long getNewLoyaltyCardNumber(Random r, int maxId) {
+        return r.nextInt(maxId);
     }
 
     /**
