@@ -53,11 +53,11 @@ class DDLTest {
         BaseChargingDemo.msg("setup");
         String password = System.getenv("S2_PASSWORD");
         if (password == null) {
-            password = "nevadaeagle";
+            password = "xraytunnel";
         }
         String host = System.getenv("S2_HOST");
         if (host == null) {
-            host = "10.13.1.103";
+            host = "10.13.1.30";
         }
         String user = System.getenv("S2_USER");
         if (user == null) {

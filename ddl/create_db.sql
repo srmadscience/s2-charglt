@@ -16,6 +16,8 @@ CREATE rowstore table user_table
 
 create index ut_del on user_table(user_last_seen);
 
+create index ut_loyaltycard on user_table (user_json_cardid);
+
 create rowstore table user_usage_table
 (userid bigint not null
 ,allocated_amount bigint not null
