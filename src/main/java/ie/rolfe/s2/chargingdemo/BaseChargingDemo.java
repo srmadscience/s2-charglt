@@ -358,10 +358,10 @@ public abstract class BaseChargingDemo {
             // How many transactions we've done...
             int tranCount = 0;
             int inFlightCount = 0;
-            int lockCount = 0;
-            int contestedLockCount = 0;
-            int fullUpdate = 0;
-            int deltaUpdate = 0;
+//            int lockCount = 0;
+//            int contestedLockCount = 0;
+//            int fullUpdate = 0;
+//            int deltaUpdate = 0;
 
             CallableStatement getAndLock = mainConnection.prepareCall("call GetAndLockUser(?,?)\n");
             CallableStatement updateLockedUser = mainConnection.prepareCall("call UpdateLockedUser(?,?,?,?)\n");
@@ -395,71 +395,9 @@ public abstract class BaseChargingDemo {
 
                     inFlightCount++;
 
-                } else if (userState[oursession].getUserStatus() == UserKVState.STATUS_LOCKED_BY_SOMEONE_ELSE) {
+                } else {
 
-                    if (userState[oursession].getOtherLockTimeMs() + ReferenceData.LOCK_TIMEOUT_MS < System
-                            .currentTimeMillis()) {
-
-                        userState[oursession].startTran();
-                        userState[oursession].setStatus(UserKVState.STATUS_TRYING_TO_LOCK);
-
-                        getAndLock.setLong(1, oursession);
-                        getAndLock.setLong(2, oursession);
-                        getAndLock.execute();
-                        shc.reportLatency(BaseChargingDemo.KV_GET, startMs, "KV Get time", 2000);
-
-                        lockCount++;
-
-                    } else {
-                        contestedLockCount++;
-                    }
-
-                } else if (userState[oursession].getUserStatus() == UserKVState.STATUS_UNLOCKED) {
-
-                    userState[oursession].startTran();
-                    userState[oursession].setStatus(UserKVState.STATUS_TRYING_TO_LOCK);
-                    getAndLock.setLong(1, oursession);
-                    getAndLock.setLong(2, oursession);
-                    getAndLock.execute();
-                    userState[oursession].setStatus(UserKVState.STATUS_LOCKED);
-                    shc.reportLatency(BaseChargingDemo.KV_GET, startMs, "KV Get time", 2000);
-                    lockCount++;
-
-                } else if (userState[oursession].getUserStatus() == UserKVState.STATUS_LOCKED) {
-
-                    userState[oursession].startTran();
-                    userState[oursession].setStatus(UserKVState.STATUS_UPDATING);
-
-                    if (deltaProportion > r.nextInt(101)) {
-
-                        // Instead of sending entire JSON object across wire ask app to update loyalty
-                        // number. For
-                        // large values stored as JSON this can have a dramatic effect on network
-                        // bandwidth
-                        updateLockedUser.setLong(1, oursession);
-                        updateLockedUser.setLong(2, oursession);
-                        updateLockedUser.setString(3, getExtraUserDataAsJsonString(jsonsize, gson, r, userCount));
-                        updateLockedUser.setString(4, "");
-                        updateLockedUser.execute();
-                        shc.reportLatency(BaseChargingDemo.KV_PUT, startMs, "KV Put Time", 2000);
-                        deltaUpdate++;
-                    } else {
-
-                        // Instead of sending entire JSON object across wire ask app to update loyalty
-                        // number. For
-                        // large values stored as JSON this can have a dramatic effect on network
-                        // bandwidth
-                        updateLockedUser.setLong(1, oursession);
-                        updateLockedUser.setLong(2, oursession);
-                        updateLockedUser.setString(3, getExtraUserDataAsJsonString(jsonsize, gson, r, userCount));
-                        updateLockedUser.setString(4, "");
-                        updateLockedUser.execute();
-                        shc.reportLatency(BaseChargingDemo.KV_PUT, startMs, "KV Put Time", 2000);
-                        fullUpdate++;
-                    }
-
-                    userState[oursession].setStatus(UserKVState.STATUS_UNLOCKED);
-
+                    doKVtransaction(userCount, jsonsize, deltaProportion, userState, oursession, getAndLock, startMs, r, updateLockedUser, gson);
                 }
 
                 tranCount++;
@@ -492,11 +430,11 @@ public abstract class BaseChargingDemo {
             }
 
             msg(inFlightCount + " events where a tx was in flight were observed");
-            msg(lockCount + " lock attempts");
-            msg(contestedLockCount + " contested lock attempts");
+            msg(shc.getCounter("LOCK_COUNT") + " lock attempts");
+            msg(shc.getCounter("CONTESTED_LOCK_COUNT") + " contested lock attempts");
             msg(lockFailCount + " lock attempt failures");
-            msg(fullUpdate + " full updates");
-            msg(deltaUpdate + " delta updates");
+            msg(shc.getCounter("FULL_UPDATE") + " full updates");
+            msg(shc.getCounter("DELTA_UPDATE") + " delta updates");
 
             tps = tranCount;
             tps = tps / (System.currentTimeMillis() - startMsRun);
@@ -510,6 +448,75 @@ public abstract class BaseChargingDemo {
         }
         // Declare victory if we got >= 90% of requested TPS...
         return tps / (tpMs * 1000) > .9;
+    }
+
+    private static void doKVtransaction(int userCount, int jsonsize, int deltaProportion, UserKVState[] userState, int oursession, CallableStatement getAndLock, long startMs, Random r, CallableStatement updateLockedUser, Gson gson) throws SQLException {
+        if (userState[oursession].getUserStatus() == UserKVState.STATUS_LOCKED_BY_SOMEONE_ELSE) {
+
+            if (userState[oursession].getOtherLockTimeMs() + ReferenceData.LOCK_TIMEOUT_MS < System
+                    .currentTimeMillis()) {
+
+                userState[oursession].startTran();
+                userState[oursession].setStatus(UserKVState.STATUS_TRYING_TO_LOCK);
+
+                getAndLock.setLong(1, oursession);
+                getAndLock.setLong(2, oursession);
+                getAndLock.execute();
+                shc.reportLatency(BaseChargingDemo.KV_GET, startMs, "KV Get time", 2000);
+
+                shc.incCounter("LOCK_COUNT");
+
+            } else {
+                shc.incCounter("CONTESTED_LOCK_COUNT");
+            }
+
+        } else if (userState[oursession].getUserStatus() == UserKVState.STATUS_UNLOCKED) {
+
+            userState[oursession].startTran();
+            userState[oursession].setStatus(UserKVState.STATUS_TRYING_TO_LOCK);
+            getAndLock.setLong(1, oursession);
+            getAndLock.setLong(2, oursession);
+            getAndLock.execute();
+            userState[oursession].setStatus(UserKVState.STATUS_LOCKED);
+            shc.reportLatency(BaseChargingDemo.KV_GET, startMs, "KV Get time", 2000);
+            shc.incCounter("LOCK_COUNT");
+
+        } else if (userState[oursession].getUserStatus() == UserKVState.STATUS_LOCKED) {
+
+            userState[oursession].startTran();
+            userState[oursession].setStatus(UserKVState.STATUS_UPDATING);
+
+            if (deltaProportion > r.nextInt(101)) {
+
+                // Instead of sending entire JSON object across wire ask app to update loyalty
+                // number. For
+                // large values stored as JSON this can have a dramatic effect on network
+                // bandwidth
+                updateLockedUser.setLong(1, oursession);
+                updateLockedUser.setLong(2, oursession);
+                updateLockedUser.setString(3, getExtraUserDataAsJsonString(jsonsize, gson, r, userCount));
+                updateLockedUser.setString(4, "");
+                updateLockedUser.execute();
+                shc.reportLatency(BaseChargingDemo.KV_PUT, startMs, "KV Put Time", 2000);
+//                          shc.incCounter("DELTA_UPDATE");
+            } else {
+
+                // Instead of sending entire JSON object across wire ask app to update loyalty
+                // number. For
+                // large values stored as JSON this can have a dramatic effect on network
+                // bandwidth
+                updateLockedUser.setLong(1, oursession);
+                updateLockedUser.setLong(2, oursession);
+                updateLockedUser.setString(3, getExtraUserDataAsJsonString(jsonsize, gson, r, userCount));
+                updateLockedUser.setString(4, "");
+                updateLockedUser.execute();
+                shc.reportLatency(BaseChargingDemo.KV_PUT, startMs, "KV Put Time", 2000);
+                shc.incCounter("FULL_UPDATE");
+            }
+
+            userState[oursession].setStatus(UserKVState.STATUS_UNLOCKED);
+
+        }
     }
 
     /**
@@ -647,7 +654,7 @@ public abstract class BaseChargingDemo {
 
                     users[randomuser].startTran();
 
-                    doTransaction(users, randomuser, r, addCredit, pid, startMs, reportUsage,tranCount);
+                    doTransaction(users, randomuser, r, addCredit, pid, startMs, reportUsage, tranCount);
                 }
 
                 tranCount++;
@@ -726,7 +733,7 @@ public abstract class BaseChargingDemo {
             shc.reportLatency(BaseChargingDemo.REPORT_QUOTA_USAGE, startMs, "REPORT_QUOTA_USAGE", 2000);
         }
 
-        users[randomuser].endTran(); 
+        users[randomuser].endTran();
     }
 
     /**
