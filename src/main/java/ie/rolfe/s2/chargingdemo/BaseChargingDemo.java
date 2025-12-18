@@ -651,7 +651,7 @@ public abstract class BaseChargingDemo {
                 }
 
                 tranCount++;
-                users[randomuser].endTran(); //TODO - Fix when we make async
+
 
                 if (tranCount % 100000 == 1) {
                     msg("Transaction " + tranCount);
@@ -725,6 +725,8 @@ public abstract class BaseChargingDemo {
             reportUsage.execute();
             shc.reportLatency(BaseChargingDemo.REPORT_QUOTA_USAGE, startMs, "REPORT_QUOTA_USAGE", 2000);
         }
+
+        users[randomuser].endTran(); 
     }
 
     /**
