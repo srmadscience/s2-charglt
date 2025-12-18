@@ -285,9 +285,6 @@ public class SafeHistogramCache {
      * Report a latency measurement, relative to now. If it's >= maxSize it goes
      * into the last element. Negative values are forced to zero.
      *
-     * @param latency
-     * @param comment
-     * @param howmany
      */
     public void reportLatency(String type, long start, String comment, int defaultSize, int count) {
         synchronized (theHistogramMap) {
@@ -335,9 +332,6 @@ public class SafeHistogramCache {
      * Report a latency measurement, relative to now, in nanoseconds. If it's >=
      * maxSize it goes into the last element. Negative values are forced to zero.
      *
-     * @param latency
-     * @param comment
-     * @param howmany
      */
     public void reportLatencyNanos(String type, long start, String comment, int defaultSize, int count) {
         synchronized (theHistogramMap) {

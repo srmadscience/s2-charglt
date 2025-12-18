@@ -173,7 +173,7 @@ public abstract class BaseChargingDemo {
      *
      * @param userCount
      * @param tpMs
-     * @param ourJson
+     * @param gson
      * @param initialCredit
      * @param mainConnection
      */
@@ -609,8 +609,8 @@ public abstract class BaseChargingDemo {
         // How many transactions we've done...
         long tranCount = 0;
         long inFlightCount = 0;
-        long addCreditCount = 0;
-        long reportUsageCount = 0;
+        //long addCreditCount = 0;
+        //long reportUsageCount = 0;
         long lastGlobalQueryMs = System.currentTimeMillis();
 
         msg("starting...");
@@ -647,32 +647,7 @@ public abstract class BaseChargingDemo {
 
                     users[randomuser].startTran();
 
-                    if (users[randomuser].spendableBalance < 1000) {
-
-                        addCreditCount++;
-
-                        final long extraCredit = r.nextInt(1000) + 1000;
-
-                        addCredit.setLong(1, randomuser);
-                        addCredit.setLong(2, extraCredit);
-                        addCredit.setString(3, "AddCreditOnShortage_" + pid + "_" + addCreditCount + "_" + System.currentTimeMillis());
-                        addCredit.execute();
-                        shc.reportLatency(BaseChargingDemo.ADD_CREDIT, startMs, "ADD_CREDIT", 2000);
-
-                    } else {
-
-                        reportUsageCount++;
-
-                        long unitsUsed = (int) (users[randomuser].currentlyReserved * 0.9);
-                        long unitsWanted = r.nextInt(100);
-                        reportUsage.setLong(1, randomuser);
-                        reportUsage.setLong(2, unitsUsed);
-                        reportUsage.setLong(3, unitsWanted);
-                        reportUsage.setLong(4, randomuser);
-                        reportUsage.setString(5, "ReportQuotaUsage_" + pid + "_" + reportUsageCount + "_" + System.currentTimeMillis());
-                        reportUsage.execute();
-                        shc.reportLatency(BaseChargingDemo.REPORT_QUOTA_USAGE, startMs, "REPORT_QUOTA_USAGE", 2000);
-                    }
+                    doTransaction(users, randomuser, r, addCredit, pid, startMs, reportUsage,tranCount);
                 }
 
                 tranCount++;
@@ -707,14 +682,49 @@ public abstract class BaseChargingDemo {
 
         msg("TPS = " + tps);
 
-        msg("Add Credit calls = " + addCreditCount);
-        msg("Report Usage calls = " + reportUsageCount);
+        msg("Add Credit calls = " + shc.getCounter("ADD_CREDIT"));
+        msg("Report Usage calls = " + shc.getCounter("REPORT_USAGE"));
         msg("Skipped because transaction was in flight = " + inFlightCount);
 
         reportRunLatencyStats(tpMs, tps);
 
         // Declare victory if we got >= 90% of requested TPS...
         return tps / (tpMs * 1000) > .9;
+    }
+
+    private static void doTransaction(UserTransactionState[] users, int randomuser, Random r, CallableStatement addCredit
+            , long pid, long startMs, CallableStatement reportUsage, long txId) throws SQLException {
+        if (users[randomuser].spendableBalance < 1000) {
+
+            //addCreditCount++;
+
+            shc.incCounter("ADD_CREDIT");
+
+            final long extraCredit = r.nextInt(1000) + 1000;
+
+            addCredit.setLong(1, randomuser);
+            addCredit.setLong(2, extraCredit);
+            addCredit.setString(3, "AddCreditOnShortage_" + pid + "_" + txId + "_" + System.currentTimeMillis());
+            addCredit.execute();
+            shc.reportLatency(BaseChargingDemo.ADD_CREDIT, startMs, "ADD_CREDIT", 2000);
+
+        } else {
+
+            //reportUsageCount++;
+
+            shc.incCounter("REPORT_USAGE");
+
+
+            long unitsUsed = (int) (users[randomuser].currentlyReserved * 0.9);
+            long unitsWanted = r.nextInt(100);
+            reportUsage.setLong(1, randomuser);
+            reportUsage.setLong(2, unitsUsed);
+            reportUsage.setLong(3, unitsWanted);
+            reportUsage.setLong(4, randomuser);
+            reportUsage.setString(5, "ReportQuotaUsage_" + pid + "_" + txId + "_" + System.currentTimeMillis());
+            reportUsage.execute();
+            shc.reportLatency(BaseChargingDemo.REPORT_QUOTA_USAGE, startMs, "REPORT_QUOTA_USAGE", 2000);
+        }
     }
 
     /**
