@@ -16,7 +16,6 @@ package ie.rolfe.s2.chargingdemo;
 
 
 import com.singlestore.jdbc.Connection;
-import com.singlestore.jdbc.client.Client;
 
 import java.util.Arrays;
 

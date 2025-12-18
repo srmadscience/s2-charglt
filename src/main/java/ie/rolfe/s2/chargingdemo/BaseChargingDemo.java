@@ -358,10 +358,6 @@ public abstract class BaseChargingDemo {
             // How many transactions we've done...
             int tranCount = 0;
             int inFlightCount = 0;
-//            int lockCount = 0;
-//            int contestedLockCount = 0;
-//            int fullUpdate = 0;
-//            int deltaUpdate = 0;
 
             CallableStatement getAndLock = mainConnection.prepareCall("call GetAndLockUser(?,?)\n");
             CallableStatement updateLockedUser = mainConnection.prepareCall("call UpdateLockedUser(?,?,?,?)\n");
