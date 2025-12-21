@@ -124,9 +124,22 @@ BEGIN
 --
 --  Update. Note we havem't implemented deltas yet
 --
-      UPDATE user_table SET user_softlock_sessionid = NULL, user_softlock_expiry = NULL, user_json_object = p_json_payload WHERE userid = p_userid;   
-      l_status_byte = 42; 
-      l_status_string = 'User ' || p_userid || ' updated';
+      IF p_delta_operation_name = 'NEW_LOYALTY_NUMBER' THEN
+--
+        UPDATE user_table SET user_softlock_sessionid = NULL, user_softlock_expiry = NULL
+                        , user_json_object::loyaltySchemeNumber = p_json_payload 
+        WHERE userid = p_userid;   
+--
+        l_status_byte = 42; 
+        l_status_string = 'User ' || p_userid || ' updated';
+--
+      ELSE 
+--
+        UPDATE user_table SET user_softlock_sessionid = NULL, user_softlock_expiry = NULL, user_json_object = p_json_payload WHERE userid = p_userid;   
+        l_status_byte = 42; 
+        l_status_string = 'User ' || p_userid || ' updated';
+--
+    END IF;
 -- 
     ELSE
 -- 

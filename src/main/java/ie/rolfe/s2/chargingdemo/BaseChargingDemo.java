@@ -493,11 +493,11 @@ public abstract class BaseChargingDemo {
                 // bandwidth
                 updateLockedUser.setLong(1, oursession);
                 updateLockedUser.setLong(2, oursession);
-                updateLockedUser.setString(3, getExtraUserDataAsJsonString(jsonsize, gson, r, userCount));
-                updateLockedUser.setString(4, "");
+                updateLockedUser.setString(3, "" + getNewLoyaltyCardNumber(r, userCount / 10));
+                updateLockedUser.setString(4, "NEW_LOYALTY_NUMBER");
                 updateLockedUser.execute();
                 shc.reportLatency(BaseChargingDemo.KV_PUT, startMs, "KV Put Time", 2000);
-//                          shc.incCounter("DELTA_UPDATE");
+                shc.incCounter("DELTA_UPDATE");
             } else {
 
                 // Instead of sending entire JSON object across wire ask app to update loyalty
@@ -507,7 +507,7 @@ public abstract class BaseChargingDemo {
                 updateLockedUser.setLong(1, oursession);
                 updateLockedUser.setLong(2, oursession);
                 updateLockedUser.setString(3, getExtraUserDataAsJsonString(jsonsize, gson, r, userCount));
-                updateLockedUser.setString(4, "");
+                updateLockedUser.setString(4, "FULL_UPDATE");
                 updateLockedUser.execute();
                 shc.reportLatency(BaseChargingDemo.KV_PUT, startMs, "KV Put Time", 2000);
                 shc.incCounter("FULL_UPDATE");
