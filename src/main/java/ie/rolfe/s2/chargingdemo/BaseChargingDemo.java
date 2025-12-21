@@ -34,6 +34,9 @@ public abstract class BaseChargingDemo {
 
     public static final long GENERIC_QUERY_USER_ID = 42;
     public static final int HISTOGRAM_SIZE_MS = 1000000;
+    public static final String CALL_ADD_CREDIT = "call AddCredit(?,?,?)\n";
+    public static final String CALL_REPORT_QUOTA_USAGE = "call ReportQuotaUsage(?,?,?,?,?)\n";
+
 
     public static final String REPORT_QUOTA_USAGE = "ReportQuotaUsage";
     public static final String KV_PUT = "KV_PUT";
@@ -612,8 +615,6 @@ public abstract class BaseChargingDemo {
         // How many transactions we've done...
         long tranCount = 0;
         long inFlightCount = 0;
-        //long addCreditCount = 0;
-        //long reportUsageCount = 0;
         long lastGlobalQueryMs = System.currentTimeMillis();
 
         msg("starting...");
@@ -622,8 +623,8 @@ public abstract class BaseChargingDemo {
         CallableStatement reportUsage = null;
 
         try {
-            addCredit = mainConnection.prepareCall("call AddCredit(?,?,?)\n");
-            reportUsage = mainConnection.prepareCall("call ReportQuotaUsage(?,?,?,?,?)\n");
+            addCredit = mainConnection.prepareCall(CALL_ADD_CREDIT);
+            reportUsage = mainConnection.prepareCall(CALL_REPORT_QUOTA_USAGE);
 
             while (endtimeMs > System.currentTimeMillis()) {
 
@@ -695,11 +696,9 @@ public abstract class BaseChargingDemo {
         return tps / (tpMs * 1000) > .9;
     }
 
-    private static void doTransaction(UserTransactionState[] users, int randomuser, Random r, CallableStatement addCredit
+    static void doTransaction(UserTransactionState[] users, int randomuser, Random r, CallableStatement addCredit
             , long pid, long startMs, CallableStatement reportUsage, long txId) throws SQLException {
         if (users[randomuser].spendableBalance < 1000) {
-
-            //addCreditCount++;
 
             shc.incCounter("ADD_CREDIT");
 
@@ -712,8 +711,6 @@ public abstract class BaseChargingDemo {
             shc.reportLatency(BaseChargingDemo.ADD_CREDIT, startMs, "ADD_CREDIT", 2000);
 
         } else {
-
-            //reportUsageCount++;
 
             shc.incCounter("REPORT_USAGE");
 

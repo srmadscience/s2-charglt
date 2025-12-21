@@ -52,7 +52,7 @@ public class ChargingDemoKVStore extends BaseChargingDemo {
         int jsonsize = Integer.parseInt(args[5]);
 
         int deltaProportion = Integer.parseInt(args[6]);
-        
+
         // Extra delay for testing really slow hardware
         int extraMs = getExtraMsIfSet();
 
@@ -61,7 +61,7 @@ public class ChargingDemoKVStore extends BaseChargingDemo {
 
 
         try {
-            Connection mainClient = connectS2(hostlist,username, password);
+            Connection mainClient = connectS2(hostlist, username, password);
 
             unlockAllRecords(mainClient);
             boolean ok = runKVBenchmark(userCount, tpMs, durationSeconds, globalQueryFreqSeconds, jsonsize, mainClient,
@@ -83,6 +83,5 @@ public class ChargingDemoKVStore extends BaseChargingDemo {
 
     }
 
-  
 
 }

@@ -59,7 +59,7 @@ public class ChargingDemoTransactions extends BaseChargingDemo {
         try {
             // A  Client object maintains multiple connections to all the
             // servers in the cluster.
-            Connection mainConnection = connectS2(hostlist, username,password);
+            Connection mainConnection = connectS2(hostlist, username, password);
 
             clearUnfinishedTransactions(mainConnection);
 

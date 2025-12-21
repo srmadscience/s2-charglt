@@ -48,8 +48,8 @@ public class DeleteChargingDemoData extends BaseChargingDemo {
         String username = args[3];
         String password = args[4];
         try {
-            Connection mainClient = connectS2(hostlist,username, password);
-            deleteAllUsers(0, userCount, tpMs,mainClient);
+            Connection mainClient = connectS2(hostlist, username, password);
+            deleteAllUsers(0, userCount, tpMs, mainClient);
 
             msg("Closing connection...");
             mainClient.close();

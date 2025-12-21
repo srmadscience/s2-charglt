@@ -14,11 +14,11 @@
  */
 package ie.rolfe.s2.chargingdemo;
 
-import java.util.Arrays;
-import java.util.Random;
-
 import com.google.gson.Gson;
 import com.singlestore.jdbc.Connection;
+
+import java.util.Arrays;
+import java.util.Random;
 
 public class CreateChargingDemoData extends BaseChargingDemo {
 
@@ -56,7 +56,7 @@ public class CreateChargingDemoData extends BaseChargingDemo {
         String username = args[4];
         String password = args[5];
         try {
-            Connection mainClient = connectS2(hostlist,username, password);
+            Connection mainClient = connectS2(hostlist, username, password);
 
             upsertAllUsers(userCount, tpMs, loblength, gson, initialCredit, mainClient);
 
