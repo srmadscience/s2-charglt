@@ -7,7 +7,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Random;
 
-public class ChargingDemoTransactionWorker extends BaseChargingDemo implements Runnable {
+public class ChargingDemoTransactionWorker extends BaseChargingDemo implements Runnable, AutoCloseable {
 
     public static final int MAX_QUEUE_SIZE = 5;
     private static final int SLEEP_NANOS = 500000;
@@ -41,16 +41,41 @@ public class ChargingDemoTransactionWorker extends BaseChargingDemo implements R
     }
 
     public boolean addRequest(Request request) {
-        synchronized (requestQueue) {
 
-            if (requestQueue.size() >= MAX_QUEUE_SIZE) {
-                shc.incCounter("QUEUE_OVERFLOW");
-                return false;
+        boolean nowait = true;
+        int qSize
+                = Integer.MAX_VALUE;
+
+        int attempts = 1;
+
+        // Note that we don't need *perfect* synchronization. We just need to stop the queue
+        // growing uncontrollably;
+        synchronized (requestQueue) {
+            qSize = requestQueue.size();
+        }
+
+        while (qSize >= MAX_QUEUE_SIZE) {
+            shc.incCounter("QUEUE_OVERFLOW");
+            attempts++;
+            nowait = false;
+            try {
+                Thread.sleep(0, SLEEP_NANOS);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
             }
 
-            requestQueue.add(request);
-            return true;
+            synchronized (requestQueue) {
+                qSize = requestQueue.size();
+            }
+
         }
+        synchronized (requestQueue) {
+            requestQueue.add(request);
+        }
+
+        shc.report(BaseChargingDemo.ATTEMPTS,attempts, "Attempts needed to get into queue", 1000);
+        return nowait;
+
     }
 
     @Override
@@ -65,8 +90,9 @@ public class ChargingDemoTransactionWorker extends BaseChargingDemo implements R
                         request = requestQueue.removeFirst();
                     }
                     final long startMs = System.currentTimeMillis();
+                    shc.reportLatency(BaseChargingDemo.QUEUE_LAG,(request.createMS - startMs), "Time spent in request queue",  10000);
                     doTransaction(users, request.randomuser, r, addCredit
-                            , request.pid, startMs, reportUsage, request.txId);
+                            , request.pid, request.createMS, reportUsage, request.txId);
 
                 } catch (SQLException e) {
                     throw new RuntimeException(e);
@@ -93,5 +119,12 @@ public class ChargingDemoTransactionWorker extends BaseChargingDemo implements R
 
         msg(workerId + ": " + message);
 
+    }
+
+    @Override
+    public void close() throws Exception {
+        if (mainConnection != null) {
+            mainConnection.close();
+        }
     }
 }

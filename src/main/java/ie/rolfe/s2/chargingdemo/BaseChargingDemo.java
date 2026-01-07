@@ -45,6 +45,8 @@ public abstract class BaseChargingDemo {
     public static final String EXTRA_MS = "EXTRA_MS";
     public static final int BATCH_SIZE = 50;
     private static final String ADD_CREDIT = "ADD_CREDIT";
+    static final String ATTEMPTS = "ATTEMPTS";
+    static final String QUEUE_LAG = "QUEUE_LAG";
     public static SafeHistogramCache shc = SafeHistogramCache.getInstance();
 
     /**
@@ -587,10 +589,11 @@ public abstract class BaseChargingDemo {
      * @param globalQueryFreqSeconds how often we check on global stats and a single
      *                               user
      * @param mainConnection
+     * @param workercount
      * @return true if within 90% of targeted TPS
      */
     protected static boolean runTransactionBenchmark(int userCount, int tpMs, int durationSeconds,
-                                                     int globalQueryFreqSeconds, Connection mainConnection, int extraMs) throws InterruptedException {
+                                                     int globalQueryFreqSeconds, Connection mainConnection, int extraMs, String hostlist , String username, String password, int workercount) throws InterruptedException {
 
         // Used to track changes and be unique when we are running multiple threads
         final long pid = getPid();
@@ -598,6 +601,19 @@ public abstract class BaseChargingDemo {
         Random r = new Random();
 
         UserTransactionState[] users = new UserTransactionState[userCount];
+
+
+        ChargingDemoTransactionWorker[] workers = new ChargingDemoTransactionWorker[workercount];
+        Thread[] workerThreads = new Thread[workercount];
+
+        msg("Creating " +workercount + " workers");
+        for (int i=0; i<workercount; i++) {
+            workers[i] = new ChargingDemoTransactionWorker(i, hostlist , username, password, r, users);
+            Thread thread = new Thread(workers[i]);
+            workerThreads[i] = thread;
+            thread.start();
+        }
+
 
         msg("Creating Connection records for " + users.length + " users");
         for (int i = 0; i < users.length; i++) {
@@ -651,7 +667,13 @@ public abstract class BaseChargingDemo {
 
                     users[randomuser].startTran();
 
-                    doTransaction(users, randomuser, r, addCredit, pid, startMs, reportUsage, tranCount);
+                    if (workercount == 0) {
+                        doTransaction(users, randomuser, r, addCredit, pid, startMs, reportUsage, tranCount);
+                    }else {
+                        Request request = new Request( tranCount,  pid,  randomuser);
+                        workers[userCount % workercount].addRequest(request);
+                    }
+
                 }
 
                 tranCount++;
@@ -675,6 +697,12 @@ public abstract class BaseChargingDemo {
             throw new RuntimeException(e);
         }
         msg("finished adding transactions to queue");
+
+        for (int i=0; i<workercount; i++) {
+            workers[i].setKeepGoing(false);
+        }
+
+
         //mainConnection.drain();
         msg("Queue drained");
 
@@ -745,6 +773,8 @@ public abstract class BaseChargingDemo {
         oneLineSummary.append(':');
 
         SafeHistogramCache.getProcPercentiles(shc, oneLineSummary, REPORT_QUOTA_USAGE);
+
+        SafeHistogramCache.getProcPercentiles(shc, oneLineSummary, ATTEMPTS);
 
         SafeHistogramCache.getProcPercentiles(shc, oneLineSummary, KV_PUT);
 

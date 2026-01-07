@@ -29,8 +29,8 @@ public class ChargingDemoTransactions extends BaseChargingDemo {
 
         msg("Parameters:" + Arrays.toString(args));
 
-        if (args.length != 7) {
-            msg("Usage: hostnames recordcount tpms durationseconds queryseconds  username password");
+        if (args.length != 8) {
+            msg("Usage: hostnames recordcount tpms durationseconds queryseconds  username password workercount");
             System.exit(1);
         }
 
@@ -51,6 +51,7 @@ public class ChargingDemoTransactions extends BaseChargingDemo {
 
         String username = args[5];
         String password = args[6];
+        int workercount = Integer.parseInt(args[7]);
 
 
         // Extra delay for testing really slow hardware
@@ -61,9 +62,10 @@ public class ChargingDemoTransactions extends BaseChargingDemo {
             // servers in the cluster.
             Connection mainConnection = connectS2(hostlist, username, password);
 
+
             clearUnfinishedTransactions(mainConnection);
 
-            boolean ok = runTransactionBenchmark(userCount, tpMs, durationSeconds, globalQueryFreqSeconds, mainConnection, extraMs);
+            boolean ok = runTransactionBenchmark(userCount, tpMs, durationSeconds, globalQueryFreqSeconds, mainConnection, extraMs, hostlist, username, password,workercount);
 
             msg("Closing connection...");
             mainConnection.close();
