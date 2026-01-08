@@ -44,6 +44,7 @@ public abstract class BaseChargingDemo {
     public static final String UNABLE_TO_MEET_REQUESTED_TPS = "UNABLE_TO_MEET_REQUESTED_TPS";
     public static final String EXTRA_MS = "EXTRA_MS";
     public static final int BATCH_SIZE = 50;
+    protected static final String QUEUE_QUEUE = "QUEUE_QUEUE";
     private static final String ADD_CREDIT = "ADD_CREDIT";
     static final String ATTEMPTS = "ATTEMPTS";
     static final String QUEUE_LAG = "QUEUE_LAG";
@@ -698,7 +699,9 @@ public abstract class BaseChargingDemo {
         }
         msg("finished adding transactions to queue");
 
+        msg("Draining queue");
         for (int i=0; i<workercount; i++) {
+            workers[i].drain();
             workers[i].setKeepGoing(false);
         }
 
@@ -772,12 +775,12 @@ public abstract class BaseChargingDemo {
         oneLineSummary.append(tps);
         oneLineSummary.append(':');
 
+        SafeHistogramCache.getProcPercentiles(shc, oneLineSummary, QUEUE_QUEUE);
+        SafeHistogramCache.getProcPercentiles(shc, oneLineSummary, ATTEMPTS);
+        SafeHistogramCache.getProcPercentiles(shc, oneLineSummary, QUEUE_LAG);
         SafeHistogramCache.getProcPercentiles(shc, oneLineSummary, REPORT_QUOTA_USAGE);
 
-        SafeHistogramCache.getProcPercentiles(shc, oneLineSummary, ATTEMPTS);
-
         SafeHistogramCache.getProcPercentiles(shc, oneLineSummary, KV_PUT);
-
         SafeHistogramCache.getProcPercentiles(shc, oneLineSummary, KV_GET);
 
         msg(oneLineSummary.toString());

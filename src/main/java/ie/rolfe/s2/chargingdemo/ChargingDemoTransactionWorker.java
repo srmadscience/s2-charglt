@@ -9,8 +9,8 @@ import java.util.Random;
 
 public class ChargingDemoTransactionWorker extends BaseChargingDemo implements Runnable, AutoCloseable {
 
-    public static final int MAX_QUEUE_SIZE = 5;
-    private static final int SLEEP_NANOS = 500000;
+    public static final int MAX_QUEUE_SIZE = 10;
+    private static final int SLEEP_NANOS = 5000;
     final ArrayList<Request> requestQueue = new ArrayList<Request>();
     int workerId;
     Connection mainConnection;
@@ -48,6 +48,8 @@ public class ChargingDemoTransactionWorker extends BaseChargingDemo implements R
 
         int attempts = 1;
 
+        final long startMs = System.currentTimeMillis();
+
         // Note that we don't need *perfect* synchronization. We just need to stop the queue
         // growing uncontrollably;
         synchronized (requestQueue) {
@@ -73,7 +75,8 @@ public class ChargingDemoTransactionWorker extends BaseChargingDemo implements R
             requestQueue.add(request);
         }
 
-        shc.report(BaseChargingDemo.ATTEMPTS,attempts, "Attempts needed to get into queue", 1000);
+        shc.reportLatency(BaseChargingDemo.QUEUE_QUEUE, startMs, "Time spent waiting to join request queue", 10000);
+        shc.report(BaseChargingDemo.ATTEMPTS, attempts, "Attempts needed to get into queue", 1000);
         return nowait;
 
     }
@@ -89,8 +92,8 @@ public class ChargingDemoTransactionWorker extends BaseChargingDemo implements R
                     synchronized (requestQueue) {
                         request = requestQueue.removeFirst();
                     }
-                    final long startMs = System.currentTimeMillis();
-                    shc.reportLatency(BaseChargingDemo.QUEUE_LAG,(request.createMS - startMs), "Time spent in request queue",  10000);
+
+                    shc.reportLatency(BaseChargingDemo.QUEUE_LAG, request.createMS, "Time spent in request queue", 10000);
                     doTransaction(users, request.randomuser, r, addCredit
                             , request.pid, request.createMS, reportUsage, request.txId);
 
@@ -119,6 +122,18 @@ public class ChargingDemoTransactionWorker extends BaseChargingDemo implements R
 
         msg(workerId + ": " + message);
 
+    }
+
+    public void drain() {
+        while (!requestQueue.isEmpty()) {
+
+            try {
+                Thread.sleep(0, SLEEP_NANOS);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+
+        }
     }
 
     @Override
