@@ -65,7 +65,7 @@ public class ChargingDemoTransactions extends BaseChargingDemo {
 
             clearUnfinishedTransactions(mainConnection);
 
-            boolean ok = runTransactionBenchmark(userCount, tpMs, durationSeconds, globalQueryFreqSeconds, mainConnection, extraMs, hostlist, username, password,workercount);
+            boolean ok = runTransactionBenchmark(userCount, tpMs, durationSeconds, globalQueryFreqSeconds, mainConnection, extraMs, hostlist, username, password, workercount);
 
             msg("Closing connection...");
             mainConnection.close();

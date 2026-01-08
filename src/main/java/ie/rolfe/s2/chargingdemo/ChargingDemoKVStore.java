@@ -28,8 +28,8 @@ public class ChargingDemoKVStore extends BaseChargingDemo {
 
         msg("Parameters:" + Arrays.toString(args));
 
-        if (args.length != 9) {
-            msg("Usage: hostnames recordcount tpms durationseconds queryseconds jsonsize deltaProportion username password");
+        if (args.length != 10) {
+            msg("Usage: hostnames recordcount tpms durationseconds queryseconds jsonsize deltaProportion username password workercount");
             System.exit(1);
         }
 
@@ -59,13 +59,15 @@ public class ChargingDemoKVStore extends BaseChargingDemo {
         String username = args[7];
         String password = args[8];
 
+        int workercount = Integer.parseInt(args[9]);
+
 
         try {
             Connection mainClient = connectS2(hostlist, username, password);
 
             unlockAllRecords(mainClient);
-            boolean ok = runKVBenchmark(userCount, tpMs, durationSeconds, globalQueryFreqSeconds, jsonsize, mainClient,
-                    deltaProportion, extraMs);
+            boolean ok = runKVBenchmark(userCount, tpMs, durationSeconds, globalQueryFreqSeconds, jsonsize, mainClient, hostlist, username, password,
+                    deltaProportion, extraMs, workercount);
 
             msg("Closing connection...");
             mainClient.close();

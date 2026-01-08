@@ -45,9 +45,9 @@ public abstract class BaseChargingDemo {
     public static final String EXTRA_MS = "EXTRA_MS";
     public static final int BATCH_SIZE = 50;
     protected static final String QUEUE_QUEUE = "QUEUE_QUEUE";
-    private static final String ADD_CREDIT = "ADD_CREDIT";
     static final String ATTEMPTS = "ATTEMPTS";
     static final String QUEUE_LAG = "QUEUE_LAG";
+    private static final String ADD_CREDIT = "ADD_CREDIT";
     public static SafeHistogramCache shc = SafeHistogramCache.getInstance();
 
     /**
@@ -331,14 +331,13 @@ public abstract class BaseChargingDemo {
      * @param durationSeconds
      * @param globalQueryFreqSeconds
      * @param jsonsize
-     * @param mainConnection
      * @param deltaProportion
      * @param extraMs
      * @return true if >=90% of requested throughput was achieved.
      * @throws InterruptedException
      */
     protected static boolean runKVBenchmark(int userCount, int tpMs, int durationSeconds, int globalQueryFreqSeconds,
-                                            int jsonsize, Connection mainConnection, int deltaProportion, int extraMs) throws InterruptedException {
+                                            int jsonsize, Connection mainConnection, String hostlist, String username, String password, int deltaProportion, int extraMs, int workercount) throws InterruptedException {
 
         double tps = 0;
 
@@ -354,6 +353,18 @@ public abstract class BaseChargingDemo {
             for (int i = 0; i < userCount; i++) {
                 userState[i] = new UserKVState(i, shc);
             }
+
+            ChargingDemoKVWorker[] workers = new ChargingDemoKVWorker[workercount];
+            Thread[] workerThreads = new Thread[workercount];
+
+            msg("Creating " + workercount + " workers");
+            for (int i = 0; i < workercount; i++) {
+                workers[i] = new ChargingDemoKVWorker(i, hostlist, username, password, r, userState);
+                Thread thread = new Thread(workers[i]);
+                workerThreads[i] = thread;
+                thread.start();
+            }
+
 
             final long startMsRun = System.currentTimeMillis();
             long currentMs = System.currentTimeMillis();
@@ -399,11 +410,17 @@ public abstract class BaseChargingDemo {
 
                 } else {
 
-                    doKVtransaction(userCount, jsonsize, deltaProportion, userState, oursession, getAndLock, startMs, r, updateLockedUser, gson);
+                    if (workercount == 0) {
+                        doKVtransaction(userCount, jsonsize, deltaProportion, userState, oursession, getAndLock, startMs, r, updateLockedUser, gson);
+                    } else {
+                        KVRequest request = new KVRequest(userCount, jsonsize, deltaProportion, userState, oursession, startMs, r, gson);
+                        workers[userCount % workercount].addRequest(request);
+                    }
+
+
                 }
 
                 tranCount++;
-                userState[oursession].endTran(); //TODO - Fix when we make async
 
                 if (tranCount % 100000 == 1) {
                     msg("Transaction " + tranCount);
@@ -420,6 +437,12 @@ public abstract class BaseChargingDemo {
 
             msg(tranCount + " transactions done...");
             msg("All entries in queue, waiting for it to drain...");
+
+            msg("Draining queue");
+            for (int i = 0; i < workercount; i++) {
+                workers[i].drain();
+                workers[i].setKeepGoing(false);
+            }
             //mainConnection.drain();
             msg("Queue drained...");
 
@@ -452,7 +475,7 @@ public abstract class BaseChargingDemo {
         return tps / (tpMs * 1000) > .9;
     }
 
-    private static void doKVtransaction(int userCount, int jsonsize, int deltaProportion, UserKVState[] userState, int oursession, CallableStatement getAndLock, long startMs, Random r, CallableStatement updateLockedUser, Gson gson) throws SQLException {
+    static void doKVtransaction(int userCount, int jsonsize, int deltaProportion, UserKVState[] userState, int oursession, CallableStatement getAndLock, long startMs, Random r, CallableStatement updateLockedUser, Gson gson) throws SQLException {
         if (userState[oursession].getUserStatus() == UserKVState.STATUS_LOCKED_BY_SOMEONE_ELSE) {
 
             if (userState[oursession].getOtherLockTimeMs() + ReferenceData.LOCK_TIMEOUT_MS < System
@@ -594,7 +617,8 @@ public abstract class BaseChargingDemo {
      * @return true if within 90% of targeted TPS
      */
     protected static boolean runTransactionBenchmark(int userCount, int tpMs, int durationSeconds,
-                                                     int globalQueryFreqSeconds, Connection mainConnection, int extraMs, String hostlist , String username, String password, int workercount) throws InterruptedException {
+                                                     int globalQueryFreqSeconds, Connection mainConnection, int extraMs,
+                                                     String hostlist, String username, String password, int workercount) throws InterruptedException {
 
         // Used to track changes and be unique when we are running multiple threads
         final long pid = getPid();
@@ -607,9 +631,9 @@ public abstract class BaseChargingDemo {
         ChargingDemoTransactionWorker[] workers = new ChargingDemoTransactionWorker[workercount];
         Thread[] workerThreads = new Thread[workercount];
 
-        msg("Creating " +workercount + " workers");
-        for (int i=0; i<workercount; i++) {
-            workers[i] = new ChargingDemoTransactionWorker(i, hostlist , username, password, r, users);
+        msg("Creating " + workercount + " workers");
+        for (int i = 0; i < workercount; i++) {
+            workers[i] = new ChargingDemoTransactionWorker(i, hostlist, username, password, r, users);
             Thread thread = new Thread(workers[i]);
             workerThreads[i] = thread;
             thread.start();
@@ -670,8 +694,8 @@ public abstract class BaseChargingDemo {
 
                     if (workercount == 0) {
                         doTransaction(users, randomuser, r, addCredit, pid, startMs, reportUsage, tranCount);
-                    }else {
-                        Request request = new Request( tranCount,  pid,  randomuser);
+                    } else {
+                        TxRequest request = new TxRequest(tranCount, pid, randomuser);
                         workers[userCount % workercount].addRequest(request);
                     }
 
@@ -700,7 +724,7 @@ public abstract class BaseChargingDemo {
         msg("finished adding transactions to queue");
 
         msg("Draining queue");
-        for (int i=0; i<workercount; i++) {
+        for (int i = 0; i < workercount; i++) {
             workers[i].drain();
             workers[i].setKeepGoing(false);
         }
