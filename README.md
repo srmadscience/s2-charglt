@@ -5,6 +5,12 @@ It has the same basic functionality of charglt, but may be missing stuff  - see 
 
 Far more documentation is available at the link above.
 
+## See Also:
+
+* [mongodb-charglt](https://github.com/srmadscience/mongodb-charglt)
+* [redis-charglt](https://github.com/srmadscience/redis-charglt)
+* [voltdb-charglt](https://github.com/srmadscience/voltdb-charglt)
+
 ## Installation
 
 1. create a DB called 'charglt'
